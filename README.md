@@ -124,8 +124,6 @@ Light and dark follow the system, or `[ui] theme`. Category colours are
 generated from a rule, not picked — a category you add gets its own
 colour the same way.
 
-<img src="docs/images/phone-day.png" alt="Day on a phone" width="260" align="right">
-
 ### Three ways to open it
 
 | | what you get | where it's for |
@@ -147,11 +145,14 @@ S3 all take one). Below 640px the page switches to its phone layout. It
 is read-only: everything that writes is shown, disabled, and says it is
 done on the Mac.
 
+<p align="center">
+  <img src="docs/images/phone-day.png" alt="Day on a phone" width="300">
+</p>
+
 ⚠️ The export carries your raw history. **Put authentication in front of
 it before the first deploy** (Cloudflare Access, Netlify Identity, …) —
 a static file scraped once cannot be recalled. Paths from your Mac are
 written as `~/…`.
-<br clear="right">
 
 ## What it collects
 
