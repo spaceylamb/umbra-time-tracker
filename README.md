@@ -11,6 +11,8 @@
   <a href="https://github.com/sherwinx/umbra-time-tracker/actions/workflows/test.yml"><img src="https://github.com/sherwinx/umbra-time-tracker/actions/workflows/test.yml/badge.svg" alt="test"></a>
 </p>
 
+https://github.com/user-attachments/assets/42345787-bee5-4efe-b78c-6bb3a4f3c060
+
 Pull your scattered digital footprints onto one timeline, and let an AI
 reconstruct **what you were actually doing all day** — sleep, commutes,
 meetings, deep work, doomscrolling — as auditable calendar events.
