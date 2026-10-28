@@ -1,0 +1,337 @@
+# Umbra configuration example. Copy to ~/.config/umbra/config.toml.
+# Without this file everything works — every setting has a usable default.
+
+# [env]
+# file = "~/.config/umbra/env" # a secrets file (lines of KEY=... or export KEY=...).
+                               # umbra loads it itself; the default is
+                               # ~/.config/umbra/env. Point this at a file you
+                               # already keep keys in. Variables already set are
+                               # never overwritten.
+
+# ── Sources ───────────────────────────────────────────────────
+# A source that is not set up (no key, no token, no file) stands aside on its
+# own and the Sources page lists it under "Not set up". To turn off one that
+# could run:
+# [sources.zsh]
+# enabled = false
+#
+# git needs to know where your repositories are (two levels deep is searched):
+# [sources.git]
+# roots = ["~/code", "~/work"]
+
+# [schedule]
+# interval_min = 360           # how often sync runs. The "not run for too long"
+                               # warning is derived from it (1.5×).
+
+# [sync]
+# infer_days = 2               # how many recent days each sync infers
+                               # (incremental: an unchanged day makes no calls)
+# infer_lookback_days = 14     # an older day that import wrote new rows to is
+                               # judged again too (late data, a source catching
+                               # up after days offline) — but only this far back,
+                               # so a source re-reporting its whole history
+                               # cannot send months to the model in one round
+
+# [ui]
+# lang = "en"                  # the page's language: en / zh
+
+# Trips across timezones. **Usually nothing to write** — every sync asks the
+# machine for its offset and records a change by itself.
+#
+# Write one only to:
+#   · add a trip from before that recording began
+#   · correct when a change was recorded — a Mac switches timezone when it is
+#     next opened and online, which can be many hours after you landed
+#
+# `from` is the clock **where you left from**. Write multi-leg trips in order;
+# each leg is read in the timezone it departed from. This decides how long that
+# day is and which days are travel days; days stay joined end to end either way.
+#
+# [[travel]]
+# from = "2026-10-05T10:00"     # leaving, on the departure clock
+# tz   = "Asia/Shanghai"        # an IANA timezone name
+
+# [infer]
+# lang = "en"                  # the language of the prompts and the cards the
+                               # voice lanes send: en / zh. Your own data stays
+                               # in whatever language it is in.
+
+# [viz]
+# raw_days = 30                # embed raw records for only the last N days;
+                               # 0 = all (the page gets large)
+
+# ── Models ────────────────────────────────────────────────────
+# With no configuration, gemini* models work directly (GEMINI_API_KEY).
+# Another provider or a local model:
+
+# [providers.ollama]
+# kind = "openai"              # OpenAI-compatible: Ollama / vLLM / llama.cpp / Fireworks
+# base_url = "http://localhost:11434/v1"
+# models = ["llama", "qwen"]   # routed by model-name prefix; umbra infer --model llama3 goes here
+# # api_key_env = "MY_KEY"     # leave out for a local server that needs none
+
+# ── Categories ────────────────────────────────────────────────
+# The built-in set is used unless you configure otherwise. To add one:
+
+# [categories.childcare]
+# en = "Childcare"
+# zh = "带娃"
+# family = "upkeep"     # optional, see below
+#
+# **You don't pick a colour.** A new category gets one, computed by the same
+# rule as the built-ins. The only hint you can give is family: categories in one
+# family look related. The nine built-in families are social / errands / ambient
+# / upkeep / focus / screen / build / rest / input, and ambient, focus, screen
+# and build each have one free slot. Every slot is tested not to collide with
+# another family's colours. Without a family, a category starts its own.
+#
+# A hue is **assigned once, the first time a category is seen, and written to
+# <data dir>/palette.json**; it never changes after. Removing a category does
+# not recolour the others — the colour you learned on Tuesday is still it on
+# Friday.
+#
+# color = "#f0abfc"   still accepted, but read as **"I'd like this hue"** rather
+#                     than a pixel value: the angle is kept, lightness and chroma
+#                     become the system's, and it is ignored if too close to an
+#                     existing family.
+#
+# Hue can reliably tell apart 8–12 things. Once the wheel is full, new
+# categories are neutral — still drawn, counted and labelled, just no longer
+# claiming to be worth remembering by colour.
+
+# To **replace the whole set** (rather than add to the built-ins):
+# [taxonomy]
+# replace = true
+# and then list all of your own [categories.*].
+#
+# Replacing affects "the list given to the model" and "what is displayed",
+# **not what is recognised** — keys already stored still read back with a name
+# and a colour, so changing configuration does not grey out your history.
+
+# ── Deploy (publish the page to your own host) ────────────────
+# This cannot go through GitHub: the page is built from your local events.db,
+# and data never goes into a repository — in the cloud there is no database and
+# nothing to build. Two pipelines, kept apart:
+#   code   your machine → git push → GitHub → CI          code only
+#   data   your machine → umbra viz → upload → your host   the page only
+#
+# ⚠️ The page embeds complete raw records. A month of it holds thousands of
+#    email addresses, tens of thousands of full URLs, and everything you said to
+#    an AI, verbatim.
+#    **Put authentication in front first**, then turn this on — a static file
+#    taken once cannot be taken back. Authentication at the edge (Cloudflare
+#    Access, Netlify Identity and the like) is safest: without signing in,
+#    nobody can download the file at all, rather than being stopped after.
+#
+# {dir} becomes the page's directory, {file} the page itself.
+
+# [deploy]
+# command = "wrangler pages deploy {dir} --project-name umbra --branch main"
+# # or rsync / netlify deploy / aws s3 sync …
+#
+# Two traps when it runs on a schedule (`umbra schedule install`), both of the
+# "import, infer and viz all green, deploy quietly failing" kind that nobody
+# notices without reading the log:
+#
+#   PATH    launchd provides only /usr/bin:/bin:/usr/sbin:/sbin, and wrangler /
+#           netlify / aws start with `#!/usr/bin/env node` (or python) — the
+#           shebang looks the interpreter up on PATH again, so an absolute path
+#           to the CLI does not help. `schedule install` freezes the PATH **at
+#           the moment of install** into the job; after changing node versions
+#           or moving things, run install again.
+#
+#   tokens  These CLIs mostly ignore an interactive login when not interactive
+#           (wrangler wants CLOUDFLARE_API_TOKEN). Put the token in the env file
+#           (see [env] at the top) — umbra loads it at the start of every
+#           command and deploy's subprocess inherits it. Never write it into
+#           command: it would sit in the job file in plain text.
+
+# ── Three priorities a week ───────────────────────────────────
+# You write up to three sentences ("ship X"), the model judges which stretches
+# of time advanced each, and the page shows whether the week went there. **No
+# keywords to list** — old project names, codenames, submodules: the model
+# recognises them from context.
+#
+#   umbra goals set "first thing" "second thing" "third thing"
+#
+# or set them on the page under `umbra serve`. Attribution catches up after
+# every sync (this week and last), with nothing to configure. The judging is a
+# plugin (umbra/plugins/goals/), on the same interface as claims and actions —
+# to change its prompt, override it in ~/.config/umbra/plugins/goals.py.
+#
+# Attribution is **stored, never recomputed**: one of its inputs is the model
+# itself, which you do not control; treated as a cache, reopening this week next
+# year would quietly show a different number.
+
+# ── Headline numbers ──────────────────────────────────────────
+# The row of numbers at the top of the page. **Sums over categories** — not new
+# categories, and no model involved — so changing a definition needs no
+# re-inference: history follows at once, with no drift in judgement.
+# Without any, the row does not appear.
+
+# [groups.productivity]
+# en = "Productivity"
+# zh = "效率"
+# cats = ["code", "research", "read"]
+
+# [groups.sleep]
+# en = "Sleep"
+# zh = "睡眠"
+# cats = ["sleep"]
+
+# ── Personal rules ────────────────────────────────────────────
+# "Using Lark is usually work" holds only for you, and often names an employer.
+# Rules go into the prompt's personal-rules section; without any, the section
+# does not appear and the prompt is the default, word for word.
+#
+# They are **hints to the model, not overrides**: no program tags a slot when it
+# sees a keyword; the model is told what a signal means in your life and still
+# judges from context.
+
+# [[rules]]
+# signal = "Xcode, Jira, or the company Slack is open"
+# means = "cat = code"
+# note = "optional: one sentence on why"
+
+# [[rules]]
+# signal = "reading newsletters in the mail app"
+# means = "cat = read"
+
+# ── Tasks heard in what you said ──────────────────────────────
+# Things you said you need to deal with → a destination you choose → nothing
+# happens until you act. This lane is a plugin that ships with Umbra
+# (umbra/plugins/actions/); `umbra plugins` shows it.
+#
+# Three switches, three decisions: installed ≠ enabled ≠ allowed to send.
+
+# [plugins.actions]
+# enabled = true               # extraction: local, free, no side effects
+# sink    = "butler"           # where it goes (butler needs UMBRA_BUTLER_URL /
+                               # UMBRA_BUTLER_PAT, the same pair as the butler source)
+# send    = true               # **off by default**. Sending creates around twenty
+                               # cards somewhere else, and the gate is over there.
+                               # Look at a few days of extraction first; with
+                               # Butler, deploy the version with the `proposed`
+                               # status (migration 0036) before turning this on.
+#
+# The lane's own tuning stays under [actions].
+# (The old `[actions] dispatch = "butler"` still works, so upgrading does not
+# quietly stop sending.)
+
+# [actions]
+# skip_domains = ["work"]      # extract and keep work-related proposals, but don't
+                               # send them. Anything the model left unclassified
+                               # passes — silence is not "work".
+# min_speakers = 2             # don't send proposals from windows where only one
+                               # person spoke. Measured echo rates: one speaker
+                               # 68%, two 52%, three 34% — alone, someone is
+                               # usually talking to an AI. Off by default: the echo
+                               # filter already catches most, and this gate's
+                               # mistakes are "remembering something real while
+                               # alone", which most deserves keeping.
+# context_win_min = 10         # minutes of transcript either side on the card
+                               # (the outer guard)
+# context_max_lines = 8        # lines either side at most (the one that matters).
+                               # Lines are the unit people read: ten minutes alone
+                               # may be three sentences, ten minutes with four
+                               # people setting up a tent forty. What is left out
+                               # is reported as "N lines omitted".
+# dedupe_threshold = 0.9       # merge "one sentence captured by two recordings" in
+                               # the card's excerpt. With a wearable and Plaud
+                               # Desktop both running in a meeting, one sentence
+                               # has two slightly different transcripts. Only
+                               # **different recordings**, close in time and alike
+                               # as text, are merged; something said twice in one
+                               # recording was said twice. Merges are reported.
+                               # 0 turns it off. Measured on a 318-sentence meeting:
+                               #   0.7 → 26% of lines removed, 4.0% of content lost
+                               #   0.9 →  7% removed, 0.2% lost  <-
+# echo_threshold = 0.35        # the echo filter. When you dictate a task to an
+                               # agent, the work is under way the moment you say
+                               # it; extracting it again turns finished work into
+                               # a card. The quote is compared with agent prompts
+                               # and clipboard text within 20 minutes; above this,
+                               # it is held back as an echo (still stored —
+                               # `umbra tasks echoes` shows why). 0 turns it off.
+# max_per_run = 5              # at most this many sent per round (5 by default).
+                               # The backlog the moment sending is switched on is
+                               # where this lane hurts most; what is cut stays
+                               # queued for the next round.
+# dispatch_days = 3            # send only what was said in the last N days. No
+                               # limit by default — silently dropping something you
+                               # said is worse than sending it three days late.
+# min_confidence = "medium"    # extracted but not sent below this. A day with a
+                               # recorder on can yield twenty or so proposals.
+                               # What is held back still
+                               # shows in `umbra tasks list` — "not sent" and "not
+                               # found" must not look alike. No bar by default; a
+                               # proposal with no confidence always passes.
+
+# Without Butler, any sink works — a shell command, a webhook, or a plugin of
+# your own with a send(). The content travels in environment variables and is
+# **never interpolated into the command line**:
+# [plugins.actions]
+# sink = "todo"
+# send = true
+# [sinks.todo]
+# kind    = "command"
+# command = 'printf "%s\n" "$UMBRA_BODY" >> ~/todo.md'
+# # or: kind = "webhook", url = "https://example.com/hook"
+
+# ── Fact-checking ─────────────────────────────────────────────
+# Claims said aloud in conversation → each looked up on the web → one card a
+# day. On means pulled out *and* looked up; it costs cents a day. It needs a
+# model that searches: gemini*, gpt* or claude*, with its key in the key file.
+
+# [plugins.claims]
+# enabled      = true
+# lookup_model = "gemini-3.8-flash"   # or "gpt-6-luna", "claude-sonnet-5-5";
+#                                     # default: the first of those with a key
+# max_lookups  = 20                   # a day at most; a lookup reaches a week back
+# model        = "gemini-3.7-flash"   # pulling claims out; default: inference's
+# sink         = "notes"              # where the day's card goes ...
+# send         = true                 # ... once you also allow it
+# lookup       = "sink"               # only to have a sink that reports back
+#                                     # (butler) do the lookups instead
+
+# The filter is fixed in umbra/plugins/claims/, measured against claims really
+# verified online, not guessed:
+#   claims with a threshold number, an effective date, an exception clause or a
+#   changing price (absolute) that the offline model called fine were wrong 33%
+#   of the time → always checked
+#   definitions, physical constants, astronomy and settled law were 100% right
+#   → let through
+
+# ── Missing data alerts ──────────────────────────────────────
+# A source that should have something every normal day (location, Plaud, WHOOP,
+# phone screen time, and the Mac's two at four days) and has gone quiet gets one
+# card per outage. The test is the newest record, not whether the import said it
+# succeeded — "succeeded, nothing new" is what a stopped source looks like.
+# `umbra stale` shows every watched source now.
+
+# On means sending: the alert is the whole plugin, so there is no `send` switch.
+
+# [plugins.staleness]
+# enabled = true
+# sink    = "butler"                  # needed: Butler, or a [sinks.<name>] command / webhook
+# days    = { location = 3, git = 7 } # change one; 0 stops watching it; a source
+#                                     # that never asked can be added
+
+# ── Things to automate ───────────────────────────────────────
+# Once a month, one card: what you keep doing on a rhythm (a page, a sign-in, a
+# kind of mail, an instruction to an agent, a place), counted from 16 weeks of
+# history, with a model's one sentence on whether it still needs you. Only what
+# does not goes on the card. Waits until there are 6 weeks of history.
+# `umbra review` prints the whole count with no model and no sink.
+
+# On means sending: the monthly list is the whole plugin, so there is no `send` switch.
+
+# [plugins.review]
+# enabled = true
+# sink    = "butler"                  # needed: Butler, or a [sinks.<name>] command / webhook
+# model   = "gemini-3.7-flash"        # default: inference's
+# weeks   = 16
+# reading = ["myblog.example.com"]    # sites you read rather than work in
+# ignore  = ['^intranet\.example\.com/']   # patterns on the page key
+# agent_prompts     = ['^Daily briefing for']  # programs writing to your agents
+# machine_providers = ["cron-bot"]             # Butler providers that are programs

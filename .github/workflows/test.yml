@@ -1,0 +1,38 @@
+# Every push and PR: the whole suite on clean macOS and Ubuntu.
+#
+# Two platforms are not decoration. The README promises the cross-platform
+# sources work on Linux, and development happens on macOS; the Ubuntu runner is
+# the only place that promise is checked. Python is tested at both ends of the
+# supported range (3.11 is the floor because of tomllib); a break in a version in
+# between is unlikely enough not to be worth doubling the machine time.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run tests
+        # No pipe: a pipe makes the exit code tail's, and CI goes green on red tests.
+        run: python -m unittest discover -s tests -t . -q
+      - name: Install from wheel and smoke-test the CLI
+        # Packaging guard: a mistake like leaving the page (umbra/web/) out of
+        # package-data only breaks people who install from a wheel — local
+        # tests stay green.
+        run: |
+          python -m pip -q install .
+          umbra --help >/dev/null
+          python -c "import os, umbra; w = os.path.join(os.path.dirname(umbra.__file__), 'web'); assert os.path.getsize(os.path.join(w, 'index.html')) > 200 and os.listdir(os.path.join(w, 'assets'))"

@@ -1,0 +1,213 @@
+/* Design tokens. docs/design.md says what each one means.
+ *
+ * Shell only. Category colours are NOT here (ADR 0003): umbra/palette.py
+ * computes them and the page sets --cat-<key> on :root at runtime from
+ * /api/meta. Writing fixed values for them here would fork the palette
+ * the first time someone adds a category.
+ *
+ * Dark mode swaps the semantic tokens, never the ramp; components never
+ * branch on theme.
+ */
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  --color-*: initial;
+
+  --color-neutral-50: #fafbfc;
+  --color-neutral-100: #f4f5f8;
+  --color-neutral-200: #e8eaef;
+  --color-neutral-300: #d8dbe2;
+  --color-neutral-400: #b4b8c2;
+  --color-neutral-500: #8b909c;
+  --color-neutral-600: #676c78;
+  --color-neutral-700: #4a4e58;
+  --color-neutral-800: #33363d;
+  --color-neutral-900: #222326;
+  --color-neutral-950: #16171a;
+
+  --color-canvas: var(--color-neutral-100);
+  --color-surface: #ffffff;
+  --color-sunken: var(--color-neutral-200);
+  --color-border: var(--color-neutral-200);
+  --color-border-strong: var(--color-neutral-300);
+  --color-ink: var(--color-neutral-900);
+  --color-ink-muted: var(--color-neutral-600);
+  --color-ink-subtle: var(--color-neutral-500);
+  --color-hover: #eceef2;
+  --color-active: #e4e6eb;
+  /* Secondary button: hover goes halfway to the held-open fill. */
+  --color-fill-hover: #e0e2e8;
+  --color-fill-open: var(--color-neutral-300);
+  /* The two colours in the shell that are not data. */
+  --color-live: #2a9c60;
+  --color-alert: #a93226;
+  --color-transparent: transparent;
+
+  --font-sans: "Geist Variable", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "Sarasa Mono SC", ui-monospace, monospace;
+
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 26px;
+  --text-2xl: 34px;
+  --text-3xl: 44px;
+
+  --leading-tight: 16px;
+  --leading-snug: 20px;
+  --leading-normal: 22px;
+  --leading-relaxed: 26px;
+
+  --tracking-tight: -0.02em;
+  --tracking-wide: 0.08em;
+
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* Motion, after fluidfunctionalism.com/docs/motion: three spring tiers,
+     zero bounce, and every exit one step quicker than its entry. The spring
+     is a critically damped one sampled into linear(); its durations are the
+     tiers' visual durations (80 / 160 / 240ms) plus the tail it takes to
+     settle. Components use these and nothing else.
+       fast      hover highlight, small toggles
+       moderate  popovers, tabs, a view's content arriving
+       slow      dialogs, drawers, the pinned header */
+  --ease-spring: linear(0, 0.076, 0.229, 0.392, 0.539, 0.659, 0.753, 0.824, 0.876, 0.913, 0.94, 0.958, 0.972, 0.981, 0.987, 0.991, 1);
+  --dur-fast: 90ms;
+  --dur-fast-out: 70ms;
+  --dur-moderate: 185ms;
+  --dur-moderate-out: 140ms;
+  --dur-slow: 275ms;
+  --dur-slow-out: 185ms;
+
+  /* Elevation. Light separates a raised surface with shadow; on a dark
+     canvas a shadow barely shows, so dark separates with a hairline of light
+     and a much deeper shadow instead — the same lift, read differently. */
+  --color-scrim: rgb(22 23 26 / 0.35);
+}
+
+@layer base {
+  /* The elevation shadows live outside @theme: Tailwind inlines a theme
+     shadow into its utility, and then the dark values below could never
+     replace it. Used as shadow-(--shadow-overlay). */
+  :root {
+    --shadow-overlay: 0 0 0 1px var(--color-border), 0 4px 12px #00000014, 0 24px 64px #0000002e;
+    --shadow-popover: 0 0 0 1px var(--color-border), 0 8px 24px #0000001a;
+    --shadow-drawer: -1px 0 0 var(--color-border), -24px 0 64px #0000001f;
+  }
+  [data-theme="dark"] {
+    --color-canvas: var(--color-neutral-900);
+    --color-surface: #2a2b2f;
+    --color-sunken: var(--color-neutral-950);
+    --color-border: var(--color-neutral-800);
+    --color-border-strong: var(--color-neutral-700);
+    --color-ink: var(--color-neutral-100);
+    --color-ink-muted: var(--color-neutral-400);
+    --color-ink-subtle: var(--color-neutral-500);
+    --color-hover: #2a2b2f;
+    --color-active: #33363d;
+    --color-fill-hover: #25262a;
+    --color-fill-open: var(--color-neutral-800);
+    --color-live: #4ecb86;
+    --color-alert: #f0938a;
+    --color-scrim: rgb(0 0 0 / 0.55);
+    --shadow-overlay: 0 0 0 1px #ffffff17, inset 0 1px 0 #ffffff0d, 0 4px 12px #00000059, 0 24px 64px #0000008c;
+    --shadow-popover: 0 0 0 1px #ffffff17, 0 8px 24px #00000080;
+    --shadow-drawer: -1px 0 0 #ffffff17, -24px 0 64px #00000080;
+  }
+
+  /* No rubber band on the page. A native Mac window bounces its content
+     *under* a toolbar that stays put; a browser can only bounce the whole
+     page, toolbar and pinned header included, so at either end the pinned
+     parts lurch away from the top and the page shows around them. A tool
+     shell that moves is less native than one that stops. Clip (not hidden)
+     so sticky still sticks; sheets keep their own overscroll-contain. */
+  html,
+  body {
+    overscroll-behavior: none;
+    overflow-x: clip;
+  }
+
+  html {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    font-synthesis: none;
+  }
+}
+
+/* "No model has looked" — the one hatch the whole app uses for unjudged time. */
+@utility hatch {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--color-border-strong) 0 1px,
+    transparent 1px 7px
+  );
+}
+
+/* Moving between views: the topbar holds still and only what is under it
+   fades in — never a crossfade of the whole page, which double-exposes two
+   pages and reads as a flash. Short, because views are switched often. */
+/* ui/Pending: hidden for the first 400ms, then shown — no flash on a fast
+   load, and never a blank page on a slow one. */
+@keyframes pending-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.pending {
+  animation: pending-in 0s 400ms both;
+}
+
+@keyframes page-in {
+  from { opacity: 0; }
+}
+.page-in {
+  animation: page-in var(--dur-moderate) var(--ease-spring);
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-in { animation: none; }
+}
+
+/* Parts of the pinned header with no original to morph from fade instead
+   (ui/Pinned). Their row turns visible in one frame; these catch up. */
+[data-on="true"] .pin-fade {
+  opacity: 1;
+  transition: opacity var(--dur-moderate) var(--ease-spring) 60ms;
+}
+[data-on="false"] .pin-fade {
+  opacity: 0;
+  transition: opacity var(--dur-moderate-out) ease-out;
+}
+/* …and parts that emerge from under the head as their originals pass
+   beneath it (Week's priorities) drop in a few pixels as they fade. */
+[data-on="true"] .pin-slide {
+  opacity: 1;
+  translate: 0 0;
+  transition: opacity var(--dur-slow) var(--ease-spring), translate var(--dur-slow) var(--ease-spring);
+}
+[data-on="false"] .pin-slide {
+  opacity: 0;
+  translate: 0 -8px;
+  transition: opacity var(--dur-slow-out) ease-out, translate var(--dur-slow-out) ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pin-slide { translate: none !important; }
+}
+/* Right after a navigation the pinned steps follow the scroll reset without
+   any motion (lib/flip `settling`). */
+[data-still] .pin-fade,
+[data-still] .pin-slide {
+  transition: none !important;
+}
