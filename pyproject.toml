@@ -1,0 +1,75 @@
+# Install:
+#   uv tool install git+https://github.com/sherwinx/umbra-time-tracker    # recommended
+#   pipx install git+https://github.com/sherwinx/umbra-time-tracker       # equivalent
+# The command is then `umbra`. In development `python3 -m umbra` is the same.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "umbra-time-tracker"
+dynamic = ["version"]
+description = "Pull your scattered digital footprints onto one timeline, and let an AI reconstruct what you were actually doing all day."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Sherwin X" }, { name = "Neethan" }]
+requires-python = ">=3.11"
+# Empty as a promise, not an oversight: everything runs on the standard library
+# (tests/test_packaging.py holds it to that).
+dependencies = []
+
+[project.optional-dependencies]
+# Only the resident collector (window titles / clipboard / idle) needs these,
+# and only on macOS.
+collector = [
+    "pyobjc-framework-Cocoa; sys_platform == 'darwin'",
+    "pyobjc-framework-Quartz; sys_platform == 'darwin'",
+    "pyobjc-framework-ApplicationServices; sys_platform == 'darwin'",
+]
+
+[project.scripts]
+umbra = "umbra.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/sherwinx/umbra-time-tracker"
+Documentation = "https://github.com/sherwinx/umbra-time-tracker/tree/main/docs"
+
+[tool.setuptools.dynamic]
+version = { attr = "umbra.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["umbra*"]
+
+[tool.setuptools.package-data]
+# The built page (web/) and the API schema — without them a wheel install has
+# no page. tests/test_packaging.py guards this class of omission, because a
+# missing package-data entry is green in every local test and only fails for
+# someone who installed.
+umbra = ["schema/*.json", "web/*", "web/assets/*"]
+
+# ── Lint ──────────────────────────────────────────────────────
+# Deliberately narrow. This codebase has house rules a general ruleset would
+# fight: bare `except Exception` around every source is the per-source fault
+# isolation the whole importer loop is built on, and module-level imports are
+# occasionally deferred on purpose (db.py reads a SCHEMA out of a module that
+# is still loading). A linter that shouts about those trains people to ignore
+# it, and then it stops catching the real thing — an unused name, a shadowed
+# builtin, an f-string with no placeholders.
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "PIE", "RUF"]
+ignore = [
+    "E501",    # line length: prose comments wrap by meaning, not by column
+    "B008",    # function call in default arg — used intentionally for paths
+    "RUF001", "RUF002", "RUF003",   # "ambiguous" unicode: the box-drawing and
+                                    # arrow characters in comments are load-bearing
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
+"umbra/db.py" = ["E402"]           # SCHEMA is assembled during module load
+"umbra/__main__.py" = ["E402"]

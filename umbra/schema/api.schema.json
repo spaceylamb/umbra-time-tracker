@@ -1,0 +1,1989 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sherwinx/umbra-time-tracker/umbra/schema/api.schema.json",
+  "title": "Umbra serve API",
+  "description": "The one contract between umbra serve (Python) and the web frontend (TypeScript). TS types are generated from this file; Python validates against it in tests with umbra/schema/validate.py. Shapes are the viz payload, cut where viz.py cuts RESIDENT from ONDEMAND.",
+  "$defs": {
+    "Meta": {
+      "description": "GET /api/meta — everything that is per page, not per day. today is computed on the server: the browser's clock and timezone are not trusted to mark today.",
+      "type": "object",
+      "required": [
+        "order",
+        "today",
+        "tz",
+        "tzOffset",
+        "generated",
+        "built_ms",
+        "page_stale_min",
+        "fresh",
+        "labels",
+        "palette",
+        "groups",
+        "lang",
+        "model",
+        "theme"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "order": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IsoDate"
+          },
+          "description": "Every day that has events, oldest first."
+        },
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "today": {
+          "$ref": "#/$defs/IsoDate"
+        },
+        "tz": {
+          "type": "string"
+        },
+        "tzOffset": {
+          "type": "string"
+        },
+        "generated": {
+          "type": "string"
+        },
+        "built_ms": {
+          "type": "integer"
+        },
+        "page_stale_min": {
+          "type": "number"
+        },
+        "lang": {
+          "type": "string"
+        },
+        "fresh": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Freshness"
+          }
+        },
+        "labels": {
+          "$ref": "#/$defs/Labels"
+        },
+        "palette": {
+          "description": "Category colours for both themes, computed by umbra/palette.py. Never tokens (ADR 0003).",
+          "type": "object",
+          "required": [
+            "light",
+            "dark"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "light": {
+              "$ref": "#/$defs/ColourMap"
+            },
+            "dark": {
+              "$ref": "#/$defs/ColourMap"
+            }
+          }
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "key",
+              "name",
+              "cats"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "cats": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "model": {
+          "$ref": "#/$defs/ModelStatus"
+        },
+        "theme": {
+          "enum": [
+            "system",
+            "light",
+            "dark"
+          ]
+        }
+      }
+    },
+    "Freshness": {
+      "description": "One source. The page does exactly one subtraction: bad || (check_ts != null && now - check_ts > stale_min*60000). The rule lives in viz.stale_fields only.",
+      "type": "object",
+      "required": [
+        "source",
+        "count",
+        "live",
+        "bad",
+        "check_ts",
+        "stale_min"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "last_event": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "last_run": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "last_ok": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "ok": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fails": {
+          "type": "integer"
+        },
+        "live": {
+          "type": "boolean"
+        },
+        "bad": {
+          "type": "boolean"
+        },
+        "check_ts": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "stale_min": {
+          "type": "number"
+        }
+      }
+    },
+    "Labels": {
+      "type": "object",
+      "required": [
+        "source",
+        "origin",
+        "block",
+        "bcode",
+        "app",
+        "category",
+        "lane_source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "origin": {
+          "description": "viz.ORIGIN: lane key -> [short, long].",
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "block": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "bcode": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "app": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "category": {
+          "$ref": "#/$defs/StringMap"
+        },
+        "lane_source": {
+          "$ref": "#/$defs/StringMap"
+        }
+      },
+      "description": "source = viz.LABEL, origin = viz.ORIGIN (lane -> [short, long]), block = viz.BNAME, bcode = bcat letter -> category key, app = apps.labels(lang), category = taxonomy.labels(lang)."
+    },
+    "Day": {
+      "description": "GET /api/day/{date} — the resident layer: what the page needs without opening anything.",
+      "type": "object",
+      "required": [
+        "date",
+        "bcat",
+        "cov",
+        "pct",
+        "counts",
+        "n_min",
+        "end",
+        "tz",
+        "travel"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/IsoDate"
+        },
+        "bcat": {
+          "type": "string",
+          "description": "One character per 5-minute slot of this day — n_min / 5 of them (288 on an ordinary day); '.' is empty. Decode with labels.block."
+        },
+        "cov": {
+          "type": "object",
+          "required": [
+            "A",
+            "B",
+            "off",
+            "C",
+            "away"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "A": {
+              "type": "integer"
+            },
+            "B": {
+              "type": "integer"
+            },
+            "off": {
+              "type": "integer"
+            },
+            "C": {
+              "type": "integer"
+            },
+            "away": {
+              "type": "integer"
+            },
+            "n_min": {
+              "type": "integer",
+              "description": "The day's length in minutes; the denominator of pct."
+            }
+          }
+        },
+        "pct": {
+          "type": "number"
+        },
+        "counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "ev": {
+          "description": "Absent when no model has composed events for this day — the page draws the hatch then, never an empty bar.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/DayEvent"
+            }
+          }
+        },
+        "evuse": {
+          "type": "string",
+          "description": "Which model's events are drawn."
+        },
+        "raw_omitted": {
+          "type": "boolean",
+          "description": "Raw records exist but were not kept for this day — not the same as having none."
+        },
+        "failed": {
+          "$ref": "#/$defs/Failed"
+        },
+        "n_min": {
+          "type": "integer",
+          "description": "How many minutes this day has: 1440 usually, 1380 / 1500 on daylight-saving days, anything when travelling. Every axis of the day is 0..n_min."
+        },
+        "end": {
+          "type": "integer",
+          "description": "How much of the day has happened, in minutes: n_min once it is over, the current minute today. Counted at read time. Nothing is drawn past it."
+        },
+        "travel": {
+          "type": "boolean",
+          "description": "The zone changed on or around this day. Its records are all there; comparisons across days leave it out."
+        },
+        "tz": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The clocks this day was read on, from the minute each began. One usually; two across a daylight-saving change or a flight.",
+          "items": {
+            "type": "object",
+            "required": [
+              "at",
+              "wall",
+              "zone",
+              "abbr",
+              "off_s"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "at": {
+                "type": "integer"
+              },
+              "wall": {
+                "type": "integer",
+                "description": "The clock on the wall when this segment began, minutes after midnight. Not always 0 for the first: the day after flying east begins when the last one ended."
+              },
+              "zone": {
+                "type": "string",
+                "description": "IANA name, e.g. America/Los_Angeles."
+              },
+              "abbr": {
+                "type": "string",
+                "description": "What the clock was called (PDT), or the offset (+08) when no name fits."
+              },
+              "off_s": {
+                "type": "integer",
+                "description": "UTC offset in seconds."
+              }
+            }
+          }
+        },
+        "minutes": {
+          "type": "object",
+          "description": "Each minute of 0..end counted once. Absent when no model has composed events. covered + failed + silent = end.",
+          "required": [
+            "end",
+            "covered",
+            "failed",
+            "silent"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "end": {
+              "type": "integer"
+            },
+            "covered": {
+              "type": "integer",
+              "description": "Inside an event."
+            },
+            "failed": {
+              "type": "integer",
+              "description": "Not inside an event, inside a window whose call failed (kind call)."
+            },
+            "silent": {
+              "type": "integer",
+              "description": "Neither: the model read it and said nothing."
+            }
+          }
+        }
+      }
+    },
+    "DayEvent": {
+      "type": "object",
+      "required": [
+        "a",
+        "b",
+        "cat",
+        "title",
+        "start",
+        "end"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "a": {
+          "type": "integer",
+          "description": "Minute of day."
+        },
+        "b": {
+          "type": "integer"
+        },
+        "cat": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "start": {
+          "type": "string"
+        },
+        "end": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "from": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sp": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Indices into detail.ai.spans[evuse]."
+        },
+        "win": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "What the first pass actually read: the spans' union plus an hour either side."
+        },
+        "dg": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Indices into detail.dg."
+        },
+        "mine": {
+          "type": "boolean",
+          "description": "your own correction (correct.py), drawn over the model's"
+        },
+        "said_at": {
+          "type": "integer",
+          "description": "when you said it, ms; what Undo names"
+        },
+        "was": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "a": {
+                "type": "integer"
+              },
+              "b": {
+                "type": "integer"
+              },
+              "cat": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string"
+              },
+              "end": {
+                "type": "string"
+              },
+              "detail": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "the model's events this correction covers"
+        },
+        "vs": {
+          "type": "object",
+          "description": "the model, having read it, holds to something else",
+          "properties": {
+            "cat": {
+              "type": "string"
+            },
+            "soft": {
+              "type": "boolean"
+            },
+            "title": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "cat",
+            "soft",
+            "title"
+          ]
+        },
+        "nosay": {
+          "type": "boolean",
+          "description": "the model said nothing about this stretch"
+        },
+        "pending": {
+          "type": "boolean",
+          "description": "the model has not been asked since you said it"
+        }
+      }
+    },
+    "DayDetail": {
+      "description": "GET /api/day/{date}/detail — the on-demand layer, minus raw records.",
+      "type": "object",
+      "required": [
+        "date"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/IsoDate"
+        },
+        "lanes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        },
+        "bruns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Run"
+          }
+        },
+        "ai": {
+          "$ref": "#/$defs/Ai"
+        },
+        "dg": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Digest"
+          }
+        }
+      }
+    },
+    "Run": {
+      "type": "object",
+      "required": [
+        "t",
+        "end",
+        "min",
+        "cat",
+        "label"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "t": {
+          "type": "string"
+        },
+        "end": {
+          "type": "string"
+        },
+        "min": {
+          "type": "integer"
+        },
+        "cat": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "cf": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Ai": {
+      "type": "object",
+      "required": [
+        "models",
+        "spans",
+        "ag"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "spans": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Span"
+            }
+          }
+        },
+        "ag": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "use": {
+          "type": "string"
+        }
+      }
+    },
+    "Span": {
+      "type": "object",
+      "required": [
+        "a",
+        "b",
+        "cat",
+        "act",
+        "conf",
+        "ev"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "a": {
+          "type": "integer"
+        },
+        "b": {
+          "type": "integer"
+        },
+        "a0": {
+          "type": "string"
+        },
+        "b0": {
+          "type": "string"
+        },
+        "cat": {
+          "type": "string"
+        },
+        "act": {
+          "type": "string"
+        },
+        "conf": {
+          "type": "string"
+        },
+        "who": {
+          "type": "string"
+        },
+        "ev": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "also": {
+          "type": "array"
+        }
+      }
+    },
+    "Digest": {
+      "description": "The text actually sent to the model for one window.",
+      "type": "object",
+      "required": [
+        "a",
+        "b",
+        "start",
+        "end",
+        "wstart",
+        "wend",
+        "n",
+        "chars",
+        "text"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "type": "integer"
+        },
+        "b": {
+          "type": "integer"
+        },
+        "start": {
+          "type": "string"
+        },
+        "end": {
+          "type": "string"
+        },
+        "wstart": {
+          "type": "string"
+        },
+        "wend": {
+          "type": "string"
+        },
+        "n": {
+          "type": "integer"
+        },
+        "chars": {
+          "type": "integer"
+        },
+        "text": {
+          "type": "string"
+        }
+      }
+    },
+    "Raw": {
+      "description": "GET /api/day/{date}/raw — every record verbatim. ts is seconds into the day.",
+      "type": "object",
+      "required": [
+        "date",
+        "records"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/IsoDate"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "ts",
+              "source",
+              "kind"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "ts": {
+                "type": "integer"
+              },
+              "source": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ApiError": {
+      "type": "object",
+      "required": [
+        "error"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "type": "string"
+        }
+      }
+    },
+    "IsoDate": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "StringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "ColourMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^#[0-9a-fA-F]{6}$"
+      }
+    },
+    "ModelStatus": {
+      "description": "The model the next run will use, and whether it can be called. Never carries the key itself. key_set is null for a provider that needs no key (a local server).",
+      "type": "object",
+      "required": [
+        "name",
+        "kind",
+        "key_env",
+        "key_set",
+        "local",
+        "env_file"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "key_env": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "key_set": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "local": {
+          "type": "boolean"
+        },
+        "env_file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "Failed": {
+      "description": "Windows whose model call failed, for one model. Absent when none did. kind auth = a person has to act (key rejected or missing); call = retried next run.",
+      "type": "object",
+      "required": [
+        "model",
+        "windows"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "windows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "a",
+              "b",
+              "at",
+              "kind",
+              "reason"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "a": {
+                "type": "integer"
+              },
+              "b": {
+                "type": "integer"
+              },
+              "at": {
+                "type": "integer"
+              },
+              "kind": {
+                "enum": [
+                  "auth",
+                  "call"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "Setup": {
+      "description": "GET /api/setup — every source and whether it can run here, now. unknown = cannot be probed (Full Disk Access), never guessed.",
+      "type": "object",
+      "required": [
+        "sources"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "source",
+              "label",
+              "what",
+              "state",
+              "needs"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "what": {
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "ready",
+                  "missing",
+                  "unknown",
+                  "unsupported",
+                  "broken"
+                ]
+              },
+              "needs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "source": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ImportProgress": {
+      "description": "GET /api/import — the running import, or the last one; run is null when none has ever run.",
+      "type": "object",
+      "required": [
+        "run"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "run",
+            "running",
+            "updated",
+            "sources"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "run": {
+              "type": "integer"
+            },
+            "running": {
+              "type": "boolean"
+            },
+            "updated": {
+              "type": "integer"
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "source",
+                  "state",
+                  "rows",
+                  "error"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "enum": [
+                      "next",
+                      "reading",
+                      "done",
+                      "failed",
+                      "aborted"
+                    ]
+                  },
+                  "rows": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Started": {
+      "description": "POST /api/import — whether this call started a run (false: one was already running).",
+      "type": "object",
+      "required": [
+        "started"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "started": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Said": {
+      "description": "GET /api/day/{date}/said — tasks and claims said aloud. held counts echoes: found, but said while dictating to an agent, so not listed. sending: whether tasks go anywhere; lookup: whether claims are checked or only the model's memory. Every field but date comes from an enabled plugin's said(); a switched-off plugin's fields are absent, and so is its tab.",
+      "type": "object",
+      "required": [
+        "date"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/IsoDate"
+        },
+        "held": {
+          "type": "integer"
+        },
+        "sending": {
+          "type": "boolean"
+        },
+        "lookup": {
+          "type": "boolean"
+        },
+        "lookup_sink": {
+          "type": "string",
+          "description": "The sink claims go to; empty when sending is off."
+        },
+        "lookup_answers": {
+          "type": "boolean",
+          "description": "Whether that sink reports back. False: claims are sent and nothing returns."
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SaidTask"
+          }
+        },
+        "claims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SaidClaim"
+          }
+        },
+        "lookup_by": {
+          "type": "string",
+          "description": "the model, or the sink, that looks claims up; empty when nothing can"
+        },
+        "looked_today": {
+          "type": "integer",
+          "description": "claims looked up today"
+        }
+      }
+    },
+    "SaidTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "t",
+        "at",
+        "win",
+        "task",
+        "quote",
+        "type",
+        "domain",
+        "confidence",
+        "status",
+        "marked",
+        "speakers",
+        "verdict"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "t": {
+          "type": "string"
+        },
+        "at": {
+          "type": "integer"
+        },
+        "win": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "task": {
+          "type": "string"
+        },
+        "quote": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "marked": {
+          "type": "boolean"
+        },
+        "speakers": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "verdict": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "How a closed task was closed: already_done or not_a_task (here or at the destination), ran (approved). Null while open."
+        }
+      }
+    },
+    "SaidClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "t",
+        "at",
+        "win",
+        "speaker",
+        "claim",
+        "quote",
+        "kind",
+        "verdict",
+        "absolute",
+        "why",
+        "status",
+        "card",
+        "would_check",
+        "seen",
+        "found",
+        "waiting"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "t": {
+          "type": "string"
+        },
+        "at": {
+          "type": "integer"
+        },
+        "win": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "speaker": {
+          "type": "string"
+        },
+        "claim": {
+          "type": "string"
+        },
+        "quote": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "verdict": {
+          "type": "string"
+        },
+        "absolute": {
+          "type": "boolean"
+        },
+        "why": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "card": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "would_check": {
+          "type": "boolean"
+        },
+        "seen": {
+          "type": "boolean",
+          "description": "Marked as looked at on the page (claim_seen)."
+        },
+        "found": {
+          "description": "What the lookup found; null until a claim is looked up (or for one checked by a sink as part of a day's report).",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "verdict",
+            "actual",
+            "misheard",
+            "sources",
+            "model"
+          ],
+          "properties": {
+            "verdict": {
+              "enum": [
+                "right",
+                "inaccurate",
+                "wrong",
+                "unsettled"
+              ]
+            },
+            "actual": {
+              "type": "string",
+              "description": "what is actually so, in a sentence or two"
+            },
+            "misheard": {
+              "type": "boolean",
+              "description": "the words read like a transcription error"
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "url",
+                  "title"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "model": {
+              "type": "string"
+            }
+          }
+        },
+        "waiting": {
+          "type": "boolean",
+          "description": "worth a lookup and not looked up yet; the next round will"
+        }
+      }
+    },
+    "Config": {
+      "description": "GET/POST /api/config — the settings the page may change. Everything else is 'Open in editor'. needs: what must be re-run before a change takes effect.",
+      "type": "object",
+      "required": [
+        "path",
+        "keys"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "key",
+              "kind",
+              "default",
+              "options",
+              "min",
+              "max",
+              "value",
+              "what",
+              "needs"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "enum",
+                  "int",
+                  "bool"
+                ]
+              },
+              "default": {
+                "type": [
+                  "string",
+                  "integer",
+                  "boolean"
+                ]
+              },
+              "options": {
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "min": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "max": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "integer",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "what": {
+                "type": "string"
+              },
+              "needs": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "Week": {
+      "description": "GET /api/week/{week} and POST /api/week/{week}/goals. Day payloads are fetched per day; this carries only what exists per week. done: days whose attribution is current for these priorities — any other day is unasked, not zero. totals: minutes per priority index (1-based, as a string key); a stretch credited to two priorities counts fully for both. judging: a judgement started by saving these priorities is still running.",
+      "type": "object",
+      "required": [
+        "week",
+        "days",
+        "goals",
+        "gdig",
+        "model",
+        "attrib",
+        "totals",
+        "done",
+        "priorities",
+        "judging",
+        "judge_failed",
+        "judge_error"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "week": {
+          "type": "string",
+          "pattern": "^\\d{4}-W\\d{2}$"
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IsoDate"
+          },
+          "minItems": 7,
+          "maxItems": 7
+        },
+        "goals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3
+        },
+        "gdig": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "attrib": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "a",
+                "b",
+                "g",
+                "why"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "type": "integer"
+                },
+                "b": {
+                  "type": "integer"
+                },
+                "g": {
+                  "type": "integer"
+                },
+                "why": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "totals": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "done": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IsoDate"
+          }
+        },
+        "priorities": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "target",
+              "unit",
+              "minutes",
+              "sessions",
+              "session_days"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "target": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "unit": {
+                "enum": [
+                  "hours",
+                  "sessions",
+                  null
+                ]
+              },
+              "minutes": {
+                "type": "integer"
+              },
+              "sessions": {
+                "type": "integer"
+              },
+              "session_days": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/IsoDate"
+                }
+              }
+            }
+          }
+        },
+        "judging": {
+          "type": "boolean",
+          "description": "This week's days are being judged against its priorities right now — started by saving new wording. Poll until false; done then says which days are current."
+        },
+        "judge_failed": {
+          "type": "boolean",
+          "description": "The judging run started by the last save ended in failure — most often no model key. The days it did not reach stay unjudged and are asked again on the next run."
+        },
+        "judge_error": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "When judge_failed: the run's own last warning, in one line — why it failed, not a guess."
+        }
+      }
+    },
+    "Settings": {
+      "description": "GET /api/settings — one section per page of the Settings dialog, all derived from config, environment and disk.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "config",
+        "general",
+        "model",
+        "schedule",
+        "plugins",
+        "categories",
+        "publishing",
+        "about"
+      ],
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/Config"
+        },
+        "general": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tz",
+            "tz_abbr"
+          ],
+          "properties": {
+            "tz": {
+              "type": "string"
+            },
+            "tz_abbr": {
+              "type": "string"
+            }
+          }
+        },
+        "model": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "rules",
+            "providers"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/ModelStatus"
+            },
+            "rules": {
+              "type": "integer"
+            },
+            "providers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "kind",
+                  "models",
+                  "builtin",
+                  "key_set"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "models": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "builtin": {
+                    "type": "boolean"
+                  },
+                  "key_set": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "schedule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "installed",
+            "platform",
+            "last_run",
+            "stale_min"
+          ],
+          "properties": {
+            "installed": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "platform": {
+              "type": "string"
+            },
+            "last_run": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "stale_min": {
+              "type": "number"
+            }
+          }
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SettingsPlugin"
+          }
+        },
+        "categories": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "families",
+            "own",
+            "groups"
+          ],
+          "properties": {
+            "families": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "family",
+                  "cats"
+                ],
+                "properties": {
+                  "family": {
+                    "type": "string"
+                  },
+                  "cats": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "key",
+                        "en",
+                        "zh",
+                        "own"
+                      ],
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "en": {
+                          "type": "string"
+                        },
+                        "zh": {
+                          "type": "string"
+                        },
+                        "own": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "own": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "key",
+                  "en",
+                  "cats"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  },
+                  "cats": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "publishing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "page",
+            "page_exists",
+            "deploy"
+          ],
+          "properties": {
+            "page": {
+              "type": "string"
+            },
+            "page_exists": {
+              "type": "boolean"
+            },
+            "deploy": {
+              "type": "boolean"
+            }
+          }
+        },
+        "about": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "license",
+            "paths"
+          ],
+          "properties": {
+            "version": {
+              "type": "string"
+            },
+            "license": {
+              "type": "string"
+            },
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "key",
+                  "label",
+                  "path",
+                  "size"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Done": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok"
+      ],
+      "description": "POST /api/said/task/{id} and /api/said/claim/{id} — ok is false when the item was not in a state the change applies to (already closed, already open).",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        }
+      }
+    },
+    "SettingsPlugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "title",
+        "what",
+        "bundled",
+        "enabled",
+        "sink",
+        "sending",
+        "can_send",
+        "sink_answers",
+        "send_what",
+        "send_only",
+        "destination",
+        "blocked"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "what": {
+          "type": "string"
+        },
+        "bundled": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "sink": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sending": {
+          "type": "boolean"
+        },
+        "can_send": {
+          "type": "boolean"
+        },
+        "sink_answers": {
+          "description": "whether the named sink can report back on one item (poll); null with no sink, or one that does not resolve",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "send_what": {
+          "description": "what the second switch also sends a copy of, in words (\"each to-do\"); null without one",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "send_only": {
+          "description": "what this plugin makes is only ever sent (an alert, a monthly list): on means sending, and there is no second switch",
+          "type": "boolean"
+        },
+        "destination": {
+          "description": "where the named sink actually sends, in words (\"Butler (your inbox)\", \"the command …\", \"the webhook at host\"); null with no sink, or one that does not resolve",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocked": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why this plugin cannot run, in words; null when it can. The switch is disabled while it cannot."
+        },
+        "lookup": {
+          "description": "Fact-check only: who looks claims up, and the choices Settings offers.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "using",
+            "model",
+            "choices",
+            "cap"
+          ],
+          "properties": {
+            "using": {
+              "type": "string",
+              "description": "the chosen choice's value: gemini, gpt, claude, sink, or custom for a lookup_model named in config.toml"
+            },
+            "model": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "the model that looks claims up; null when a sink does"
+            },
+            "cap": {
+              "type": "integer",
+              "description": "lookups a day at most"
+            },
+            "choices": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "value",
+                  "label",
+                  "model",
+                  "note",
+                  "key_env",
+                  "key_set"
+                ],
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "key_env": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "key_set": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

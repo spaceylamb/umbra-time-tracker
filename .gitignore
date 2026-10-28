@@ -1,0 +1,35 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# The database never goes in the repository. It lives in Umbra's data
+# directory and holds browsing history, clipboard text and window titles —
+# about as private as raw data gets.
+*.db
+*.db-wal
+*.db-shm
+
+# The page. It is written to the data directory, not here; this is a guard
+# against --out pointing at the wrong place, or a copy dragged in by hand. It
+# embeds browsing history, clipboard text and AI conversations in full — as
+# sensitive as *.db.
+umbra-viz.html
+*.viz.html
+places.json
+# Palette assignments: derived state, but keyed by category names you chose.
+palette.json
+.claude/
+
+# Packaging output. `pip install .` writes build/, and on 2026-08-20 it slipped
+# into a commit: a stale copy of the source that reads like a second
+# implementation.
+build/
+dist/
+*.egg-info/
+node_modules/
+
+# TypeScript incremental build state
+*.tsbuildinfo
+
+# The launch film: sources and renders stay on this machine
+film/
