@@ -500,8 +500,9 @@ class CategoryNamesTest(unittest.TestCase):
     def test_one_copy_in_the_whole_project(self):
         """assertIs, not assertEqual — the latter is green for "copied and
         currently the same", which is exactly this bug's shape."""
-        from umbra import __main__ as cli, viz
-        self.assertIs(cli.CAT_NAME, blocks.CAT_NAME)
+        from umbra import viz
+        from umbra.commands import days
+        self.assertIs(days.CAT_NAME, blocks.CAT_NAME)
         self.assertIs(viz.BNAME, blocks.CAT_NAME)
 
     def test_every_rung_has_a_band_code(self):
