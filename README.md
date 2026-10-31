@@ -8,7 +8,7 @@
 <h1 align="center">Umbra</h1>
 
 <p align="center">
-  <a href="https://github.com/sherwinx/umbra-time-tracker/actions/workflows/test.yml"><img src="https://github.com/sherwinx/umbra-time-tracker/actions/workflows/test.yml/badge.svg" alt="test"></a>
+  <a href="https://github.com/spaceylamb/umbra-time-tracker/actions/workflows/test.yml"><img src="https://github.com/spaceylamb/umbra-time-tracker/actions/workflows/test.yml/badge.svg" alt="test"></a>
 </p>
 
 https://github.com/user-attachments/assets/42345787-bee5-4efe-b78c-6bb3a4f3c060
@@ -47,10 +47,21 @@ How much of the day it can see depends on what you connect:
 A source you have not set up stands aside and is listed as *Not set up* —
 it is never a failure. `umbra sources` says what each one is missing.
 
+### Platforms
+
+| | what runs |
+|---|---|
+| macOS | everything — including the sources only macOS has: `chrome`, `app`, `iphone`, `media`, `intent`, and the live collector. `umbra schedule install` sets up launchd |
+| Linux | `claude`, `zsh`, `git`, and the account sources `whoop`, `plaud`, `weread`, `location`, `butler`. `umbra schedule install` prints a systemd timer for you to install |
+| Windows | not supported yet: the paths resolve, but nothing schedules a run and nothing has been tried there |
+
+Chrome is on the macOS list because its importer reads the History file
+where macOS keeps it; on Linux it stands aside even with Chrome installed.
+
 ## Quick start
 
 ```bash
-uv tool install git+https://github.com/sherwinx/umbra-time-tracker   # or: pipx install ...
+uv tool install git+https://github.com/spaceylamb/umbra-time-tracker   # or: pipx install ...
 
 umbra sources          # what can be collected on this machine, what's missing
 umbra import           # pull everything (incremental, idempotent)
@@ -59,7 +70,7 @@ umbra viz              # the same page as one self-contained file
 umbra export --out DIR # …or as a static site, read-only — what the phone reads
 umbra infer 2026-08-17 # let a model judge the day (needs an API key)
 umbra sync             # import → infer → page in one idempotent command
-umbra schedule install # run sync every 6 h via launchd/systemd
+umbra schedule install # run sync every 6 h via launchd (Linux: prints a systemd timer)
 ```
 
 Keys (`GEMINI_API_KEY`, `WHOOP_CLIENT_ID`, …) go in `~/.config/umbra/env`
@@ -70,7 +81,7 @@ tier-2 sources, grant Full Disk Access to the file `umbra doctor` names.
 Requires Python 3.11+. Hacking on a clone? `python3 -m umbra …` is the
 same thing. The backfill path is stdlib-only; the live collector (window
 titles, clipboard, input idle) needs PyObjC on macOS
-(`uv tool install "umbra-time-tracker[collector] @ git+https://github.com/sherwinx/umbra-time-tracker"`).
+(`uv tool install "umbra-time-tracker[collector] @ git+https://github.com/spaceylamb/umbra-time-tracker"`).
 The page ships pre-built, so using Umbra needs neither Node nor Bun. The
 one exception is PLAUD: its authorisation comes from PLAUD's own CLI
 (`npm i -g @plaud-ai/cli && plaud login`), so connecting a recorder needs

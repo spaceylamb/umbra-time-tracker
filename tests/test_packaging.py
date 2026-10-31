@@ -2,8 +2,8 @@
 pipx" true.
 
 Installing (aligned with the README's quick start):
-    uv tool install git+https://github.com/sherwinx/umbra-time-tracker   # or
-    pipx install git+https://github.com/sherwinx/umbra-time-tracker
+    uv tool install git+https://github.com/spaceylamb/umbra-time-tracker   # or
+    pipx install git+https://github.com/spaceylamb/umbra-time-tracker
 The command is then `umbra`; no more "find the right python3".
 
 This tests the metadata itself; "it really runs once installed" is checked in
