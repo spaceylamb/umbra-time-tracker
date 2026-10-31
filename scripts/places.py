@@ -17,7 +17,6 @@ Naming is a one-time job: the ten places with the most time in a month cover
 
 import collections
 import datetime as dt
-import json
 import os
 import sys
 import time

@@ -12,7 +12,6 @@ The model is part of every cache key, so changing it re-asks the windows it
 covers: what one model answered is not what another would.
 """
 
-import os
 import unittest
 from unittest import mock
 

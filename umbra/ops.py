@@ -587,7 +587,7 @@ def job_lock(name: str, wait_s: float | None = None, dir: str | None = None):
 
 
 def _run_infer(days):
-    from . import db, infer, inference as INF
+    from . import db, infer
     con = db.connect()
     for day in days:
         r = infer.run_day(con, day)

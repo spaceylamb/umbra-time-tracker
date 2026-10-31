@@ -21,7 +21,8 @@ private things private".
 1. Read [AGENTS.md](AGENTS.md). It is written for coding agents, but it is the
    shortest accurate description of how the code fits together and which rules
    are easy to break. If you work with an agent, it will read it too.
-2. Run the suite: `python3 -m unittest discover -s tests -t . -q`.
+2. Run the suite: `python3 -m unittest discover -s tests -t . -q`, and
+   `ruff check .` (the rules in `pyproject.toml` catch mistakes, not style).
 3. If you touched `web/src`, keep to [docs/design.md](docs/design.md) and
    [docs/ux.md](docs/ux.md), and work through the checklist at the end of
    `ux.md`. If you touched `web/src` or the API schema, run

@@ -21,8 +21,6 @@ The fix was not writing the wrapper correctly but leaving it no reason to exist:
                      (-u against buffering, absolute paths, logs not in /tmp)
 """
 
-import contextlib
-import io
 import os
 import sys
 import tempfile

@@ -1432,7 +1432,6 @@ class ExcerptBoundTest(unittest.TestCase):
 
     def test_lines_are_capped(self):
         out = self._ex(win=600, max_lines=5)
-        body = [l for l in out.splitlines() if l.startswith("2") or "第" in l]
         # 5 before + the line + 5 after, plus the omission marks
         self.assertLessEqual(sum(1 for l in out.splitlines() if "第" in l), 11)
 
@@ -2226,8 +2225,8 @@ class SaidTwiceTest(unittest.TestCase):
         self.assertEqual(self.status(b), "proposed")
 
     def test_nothing_new_asks_nothing(self):
-        a = self.add("09:10", "Book the car service")
-        b = self.add("09:50", "Get the car serviced")
+        self.add("09:10", "Book the car service")
+        self.add("09:50", "Get the car serviced")
         call = mock.Mock()
         actions.mark_duplicates(self.con, DAY, [], call=call)
         call.assert_not_called()

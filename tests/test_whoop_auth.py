@@ -7,7 +7,6 @@ development never reaches the refresh branch; refresh logic has to be covered
 by tests, not by trying it.
 """
 
-import json
 import os
 import stat
 import tempfile

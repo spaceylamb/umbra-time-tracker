@@ -36,3 +36,32 @@ jobs:
           python -m pip -q install .
           umbra --help >/dev/null
           python -c "import os, umbra; w = os.path.join(os.path.dirname(umbra.__file__), 'web'); assert os.path.getsize(os.path.join(w, 'index.html')) > 200 and os.listdir(os.path.join(w, 'assets'))"
+
+  lint:
+    # The narrow ruleset in pyproject.toml: mistakes, not style. Pinned, so a
+    # new ruff release cannot turn the build red on a day nothing changed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip -q install ruff==0.17.3
+      - run: ruff check .
+
+  web:
+    # The page has its own tests and types; the Python suite only checks that
+    # the committed build (umbra/web/) is not older than web/src.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile --cwd web
+      - name: Tests
+        run: bun test --cwd web
+      - name: Types
+        # typecheck regenerates src/api/types.ts from the schema first; a diff
+        # afterwards means the committed types fell behind the schema.
+        run: |
+          bun run --cwd web typecheck
+          git diff --exit-code -- web/src/api/types.ts

@@ -15,12 +15,10 @@ suggestions:
 """
 
 import contextlib
-import datetime as dt
 import io
 import json
 import os
 import tempfile
-import types
 import unittest
 from unittest import mock
 
