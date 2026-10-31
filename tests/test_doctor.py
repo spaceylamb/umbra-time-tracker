@@ -53,7 +53,8 @@ class JobPythonTest(unittest.TestCase):
             open(real, "w").close()
             link = os.path.join(d, "python")
             os.symlink(real, link)
-            with mock.patch.object(m, "launchd_python", lambda: link):
+            from umbra.commands import doctor
+            with mock.patch.object(doctor, "launchd_python", lambda: link):
                 self.assertEqual(m.tcc_binary(), os.path.realpath(real))
 
 

@@ -171,8 +171,8 @@ class WiringTest(unittest.TestCase):
         bad = []
         for f in glob.glob(os.path.join(here, "umbra", "**", "*.py"),
                            recursive=True):
-            if os.path.basename(f) in ("paths.py", "__main__.py"):
-                continue        # paths.py owns them; __main__ reads macOS TCC
+            if os.path.basename(f) in ("paths.py", "doctor.py"):
+                continue        # paths.py owns them; commands/doctor.py reads macOS TCC
             body = open(f, encoding="utf-8").read()
             if re.search(r"^PLATFORM\s*=", body, re.M):
                 continue
