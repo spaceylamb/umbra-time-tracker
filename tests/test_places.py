@@ -9,7 +9,6 @@ means to you. Your home's coordinates come back as a street address, never as
 a home address.
 """
 
-import json
 import os
 import tempfile
 import unittest

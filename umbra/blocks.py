@@ -31,6 +31,8 @@ go away. Merged into one category, "we should add data" and "we should fix an
 assumption" become indistinguishable.
 """
 
+import re
+
 SLICE_MIN = 5
 BLOCKS = 1440 // SLICE_MIN
 
@@ -137,8 +139,6 @@ def _span(e: dict, lo_ms: int, nb: int = BLOCKS) -> range:
     # IndexError, a long one would have its end clamped away with no error.
     return range(max(0, int(a)), min(nb - 1, int(b)) + 1)
 
-
-import re
 
 # Nothing that looks like an id goes into a label. An unreadable label is the
 # same as no label, except that it also occupies the space and implies there is

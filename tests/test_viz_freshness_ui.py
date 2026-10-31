@@ -13,7 +13,6 @@ Chasing it took far longer than adding a "built at X" line to the page would.
 """
 
 import os
-import re
 import sqlite3
 import tempfile
 import unittest

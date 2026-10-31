@@ -8,14 +8,13 @@
 """
 
 import argparse
-import json
 import sqlite3
 import os
 import sys
 import time
 
 from . import analyze, db, inference as INF, ops, sources
-from .importers import ALL, SOURCE_OF
+from .importers import ALL
 from .plaud_auth import PlaudAuthExpired
 from .whoop_auth import WhoopAuthExpired
 

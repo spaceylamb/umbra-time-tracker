@@ -12,7 +12,6 @@ That is the point of reading WHOOP — hours that were a hole become explained.
 
 import sqlite3
 import unittest
-from unittest import mock
 
 from umbra import analyze, db
 

@@ -29,7 +29,6 @@ producing two judgements for the same stretch of time.
 """
 
 import concurrent.futures
-import json
 import os
 import re
 import time
