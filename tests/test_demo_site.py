@@ -68,6 +68,78 @@ class DemoSiteTest(unittest.TestCase):
     def test_it_leaves_nothing_in_its_home(self):
         self.assertEqual(os.listdir(self.home), [])
 
+    def week(self, wk: str) -> dict:
+        with open(os.path.join(self.out, "api", "week", wk + ".json"), encoding="utf-8") as f:
+            return json.load(f)
+
+    def test_three_whole_weeks_before_the_last(self):
+        """Enough to page back through: three weeks of seven days each, and
+        the reference week the page opens on."""
+        order = self.meta["order"]
+        for wk, mon in (("2026-W34", "2026-08-17"), ("2026-W35", "2026-08-24"),
+                        ("2026-W36", "2026-08-31")):
+            with self.subTest(wk):
+                first = order.index(mon)
+                self.assertEqual(len([d for d in order[first:first + 7]
+                                      if d in self.week(wk)["days"]]), 7)
+        self.assertEqual(order[-1], devseed.DAY)
+
+    def test_every_week_has_its_priorities(self):
+        for wk in ("2026-W34", "2026-W35", "2026-W36", "2026-W37"):
+            with self.subTest(wk):
+                self.assertEqual([p["text"] for p in self.week(wk)["priorities"]], devseed.GOALS)
+
+    def test_the_weeks_get_better(self):
+        """A trend to see: more nights asleep before midnight and more hours on
+        the first priority, week after week."""
+        pr = [self.week(wk)["priorities"] for wk in ("2026-W34", "2026-W35", "2026-W36")]
+        sleep = [p[2]["sessions"] for p in pr]
+        ship = [p[0]["minutes"] for p in pr]
+        self.assertTrue(sleep[0] < sleep[1] < sleep[2], sleep)
+        self.assertTrue(ship[0] < ship[1] < ship[2], ship)
+
+    def test_no_made_up_day_has_a_long_silence(self):
+        """Thinning a day for variety must not leave hours the model "said
+        nothing about" — only the two days kept unjudged or failed on purpose."""
+        import datetime as dt
+        last = dt.date.fromisoformat(devseed.DAY)
+        kept = {(last - dt.timedelta(days=n)).isoformat() for n in (devseed.UNJUDGED, devseed.FAILED)}
+        for day in self.meta["order"]:
+            if day in kept:
+                continue
+            with open(os.path.join(self.out, "api", "day", day + ".json"), encoding="utf-8") as f:
+                silent = json.load(f)["minutes"]["silent"]
+            with self.subTest(day):
+                self.assertLessEqual(silent, 120)
+
+    def test_the_reference_day_is_what_the_readme_shows(self):
+        """DAY is the day the README's screenshots were taken of: adding or
+        changing the other days must not move one record of it."""
+        with open(os.path.join(self.out, "api", "day", devseed.DAY + ".json"), encoding="utf-8") as f:
+            day = json.load(f)
+        self.assertEqual(day["counts"], {"whoop": 2, "chrome": 32, "claude": 76, "zsh": 46, "git": 9})
+        self.assertEqual(day["minutes"]["covered"], 1370)
+
+    def test_a_late_night_is_one_night(self):
+        """A day that starts up late follows an evening that ended up late, and
+        an evening that ended asleep is followed by a morning asleep."""
+        def ev(day):
+            with open(os.path.join(self.out, "api", "day", day + ".json"), encoding="utf-8") as f:
+                return (json.load(f).get("ev") or {}).get(devseed.MODEL) or []
+        order = self.meta["order"]
+        for day, nxt in zip(order, order[1:]):
+            a, b = ev(day), ev(nxt)
+            if a and b and nxt != devseed.DAY:
+                with self.subTest(day):
+                    self.assertEqual(a[-1]["title"] == "Up late, scrolling",
+                                     b[0]["title"] == "Up late, scrolling")
+
+    def test_a_weekend_is_not_a_workday(self):
+        with open(os.path.join(self.out, "api", "day", "2026-08-30.json"), encoding="utf-8") as f:
+            sunday = json.load(f)
+        titles = " ".join(e["title"] for e in sunday["ev"][devseed.MODEL])
+        self.assertNotIn("office", titles)
+
 
 class SafetyTest(unittest.TestCase):
     def test_never_writes_over_an_existing_database(self):
