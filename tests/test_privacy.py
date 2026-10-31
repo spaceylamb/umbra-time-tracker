@@ -107,7 +107,7 @@ class ClassifyUrlKeepTest(unittest.TestCase):
 
     def test_ordinary_browsing_is_kept(self):
         for url, title in (
-                ("https://github.com/sherwinx/umbra-time-tracker", "Umbra"),
+                ("https://github.com/spaceylamb/umbra-time-tracker", "Umbra"),
                 ("https://news.ycombinator.com/", "Hacker News"),
                 ("https://en.wikipedia.org/wiki/Sleep", "Sleep - Wikipedia"),
                 ("https://docs.python.org/3/library/sqlite3.html", "sqlite3")):

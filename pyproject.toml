@@ -1,6 +1,6 @@
 # Install:
-#   uv tool install git+https://github.com/sherwinx/umbra-time-tracker    # recommended
-#   pipx install git+https://github.com/sherwinx/umbra-time-tracker       # equivalent
+#   uv tool install git+https://github.com/spaceylamb/umbra-time-tracker    # recommended
+#   pipx install git+https://github.com/spaceylamb/umbra-time-tracker       # equivalent
 # The command is then `umbra`. In development `python3 -m umbra` is the same.
 
 [build-system]
@@ -32,8 +32,8 @@ collector = [
 umbra = "umbra.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/sherwinx/umbra-time-tracker"
-Documentation = "https://github.com/sherwinx/umbra-time-tracker/tree/main/docs"
+Homepage = "https://github.com/spaceylamb/umbra-time-tracker"
+Documentation = "https://github.com/spaceylamb/umbra-time-tracker/tree/main/docs"
 
 [tool.setuptools.dynamic]
 version = { attr = "umbra.__version__" }

@@ -66,7 +66,7 @@ COMMANDS = ["git status", "python3 -m unittest", "rg claims umbra/", "git diff",
             "python3 -m umbra viz --fresh", "ls umbra/plugins"]
 PAGES = [("https://news.ycombinator.com/", "Hacker News"),
          ("https://mail.google.com/", "Inbox"),
-         ("https://github.com/sherwinx/umbra-time-tracker/pulls", "Pull requests"),
+         ("https://github.com/spaceylamb/umbra-time-tracker/pulls", "Pull requests"),
          ("https://www.inkandswitch.com/local-first/", "Local-first software"),
          ("https://excalidraw.com/", "umbra week view — Excalidraw")]
 
