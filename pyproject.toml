@@ -49,24 +49,27 @@ include = ["umbra*"]
 umbra = ["schema/*.json", "web/*", "web/assets/*"]
 
 # ── Lint ──────────────────────────────────────────────────────
-# Deliberately narrow. This codebase has house rules a general ruleset would
-# fight: bare `except Exception` around every source is the per-source fault
-# isolation the whole importer loop is built on, and module-level imports are
+# Deliberately narrow, and run on every push (.github/workflows/test.yml): the
+# rules that find a real mistake — a name used but never defined, an import or
+# a variable nobody reads, an f-string with no placeholders, a mutable default,
+# a closure that sees the wrong loop variable, an escape sequence that is not
+# one. Style is left out on purpose. This codebase has house rules a general
+# ruleset would fight: bare `except Exception` around every source is the
+# per-source fault isolation the whole importer loop is built on, imports are
 # occasionally deferred on purpose (db.py reads a SCHEMA out of a module that
-# is still loading). A linter that shouts about those trains people to ignore
-# it, and then it stops catching the real thing — an unused name, a shadowed
-# builtin, an f-string with no placeholders.
+# is still loading), and short `a = …; b = …` lines and one-letter names read
+# better in the places they are used. A linter that shouts about those trains
+# people to ignore it, and then it stops catching the real thing.
 [tool.ruff]
 line-length = 88
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "C4", "PIE", "RUF"]
+select = ["E4", "E7", "E9", "F", "W605", "B006", "B023", "PLE"]
 ignore = [
-    "E501",    # line length: prose comments wrap by meaning, not by column
-    "B008",    # function call in default arg — used intentionally for paths
-    "RUF001", "RUF002", "RUF003",   # "ambiguous" unicode: the box-drawing and
-                                    # arrow characters in comments are load-bearing
+    "E702",    # two short statements on one line, where they belong together
+    "E731",    # a named lambda, where a def would be heavier than the line it saves
+    "E741",    # `l` for a line, `I` for an index — clear where they are used
 ]
 
 [tool.ruff.lint.per-file-ignores]

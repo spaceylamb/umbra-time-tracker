@@ -19,7 +19,6 @@ page ("not included in this build"), never look like "no records that day".
 """
 
 import os
-import sqlite3
 import tempfile
 import unittest
 from unittest import mock

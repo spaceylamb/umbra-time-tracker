@@ -6,9 +6,7 @@ it would sooner or later be picked up by `git add -A`. The reason .gitignore
 excludes *.db applies to its rendered form too.
 """
 
-import json
 import os
-import re
 import sqlite3
 import tempfile
 import unittest

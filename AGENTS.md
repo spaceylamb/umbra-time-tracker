@@ -25,11 +25,12 @@ sources (umbra/importers/, ~/.config/umbra/sources/)
 | path | what lives there |
 |---|---|
 | `umbra/__main__.py` | the `umbra` CLI: `sync`, `serve`, `sources`, `plugins`, `setup`, `export`… |
+| `umbra/commands/` | the rest of the CLI, one module per group (`doctor` and `schedule`, `freshness`, `plugin_cli`, `days`); `__main__.py` re-exports every `cmd_*` and builds the parser |
 | `umbra/importers/` | the built-in sources, one file each |
 | `umbra/sources.py`, `registry.py`, `render.py` | source discovery, health checks, how a source's records render into the digest |
 | `umbra/digest.py`, `infer.py`, `inference.py` | the text the model reads, the model call, and the guesses it returns |
 | `umbra/analyzer.py`, `sink.py` | the plugin machinery: windowing, caching, the model call, sending |
-| `umbra/plugins/` | bundled plugins: `goals`, `claims`, `actions`, `staleness`, `review`, plus `butler` (reference Sink) |
+| `umbra/plugins/` | bundled plugins: `goals`, `claims`, `actions`, `staleness`, `review`, plus `butler` (reference Sink). The larger ones are packages: `__init__.py` holds the declarations and the entry points, `prompts.py` the text sent to a model, the rest one concern each |
 | `umbra/privacy.py` | what is dropped or redacted at import time |
 | `umbra/taxonomy.py`, `palette.py` | activity categories and their derived colours |
 | `umbra/api.py`, `serve.py`, `viz.py`, `export.py` | the HTTP API, the local server, the page's data, the static export |

@@ -20,7 +20,6 @@ events stay as they were, zero calls.
 
 import os
 import re
-import sqlite3
 import tempfile
 import unittest
 from unittest import mock

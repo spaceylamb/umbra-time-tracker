@@ -23,7 +23,7 @@ import os
 import re
 import shutil
 
-from . import api, config, db, goals as G, settings, viz
+from . import api, config, db, goals as G, settings
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 MARK = "<!--umbra-static-->"

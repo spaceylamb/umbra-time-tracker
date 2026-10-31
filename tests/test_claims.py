@@ -465,7 +465,6 @@ class OneWaySinkTest(unittest.TestCase):
         follow up on, and the CLI read that as nothing sent."""
         import io
         import types
-        from umbra import __main__ as cli
         conf = self._conf()
         out = io.StringIO()
         with mock.patch.object(claims, "_conf", return_value=conf), \

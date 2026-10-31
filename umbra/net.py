@@ -161,7 +161,7 @@ def get_json(url: str, headers: dict | None = None, timeout: int = 60,
     for attempt in range(retries + 1):
         req = urllib.request.Request(url, headers=_headers(headers))
         try:
-            return _retrying(lambda: _read_json(req, timeout), idempotent=True)
+            return _retrying(lambda req=req: _read_json(req, timeout), idempotent=True)
         except urllib.error.HTTPError as e:
             if e.code != 429 or attempt == retries:
                 raise
