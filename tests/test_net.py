@@ -112,7 +112,6 @@ class RateLimitRetryTest(unittest.TestCase):
     def test_non_429_is_not_retried(self):
         """A 401 stays a 401 however often it is retried; retrying only delays
         the error."""
-        _, slept = None, None
         with self.assertRaises(urllib.error.HTTPError):
             self._run([self._err(401), None])
         with mock.patch.object(net.urllib.request, "urlopen",

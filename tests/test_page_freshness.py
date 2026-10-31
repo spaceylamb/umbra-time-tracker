@@ -32,12 +32,8 @@ hours without an update — eight hours down and you could not see it. The
 threshold has to follow each source's own interval.
 """
 
-import json
 import os
-import re
-import shutil
 import sqlite3
-import subprocess
 import tempfile
 import time
 import unittest

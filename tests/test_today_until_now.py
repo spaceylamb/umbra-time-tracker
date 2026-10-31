@@ -18,7 +18,6 @@ cached day.
 import datetime as dt
 import json
 import os
-import sqlite3
 import tempfile
 import unittest
 from unittest import mock

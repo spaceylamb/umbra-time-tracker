@@ -49,10 +49,14 @@ The floor is Plaud's upload delay (median 40 hours, measured). This catches
 
 import json
 import os
-import re
 import subprocess
 
 from ... import analyzer, config
+from .prompts import AFTER_MARK, DUP_PROMPT_EN, DUP_PROMPT_ZH, MARK_BLOCK_EN, MARK_BLOCK_ZH, PROMPT_EN, PROMPT_ZH, QUOTE_MARK_EN, QUOTE_MARK_ZH, TARGET_MARK, _CARD_TEXT, _card, _prompt, quote_mark, render_marks  # noqa: F401  (re-exported)
+from .echo import DEDUPE_MIN_CHARS, DEDUPE_NEAR_MS, DEDUPE_THRESHOLD, ECHO_GRAM, ECHO_MIN_CHARS, ECHO_THRESHOLD, ECHO_WINDOW_MIN, _grams, echo_match, echo_pool, echo_score, same_utterance  # noqa: F401  (re-exported)
+from .judge import CONF_ORDER, DOMAINS, MARK_NEAR_MIN, TYPES, _minute_of, _norm_conf, _norm_domain, _norm_type, _owns_quote, _speakers_in, marks_in  # noqa: F401  (re-exported)
+from .store import PLUGIN, _LEGACY_COLS, _write, record, records  # noqa: F401  (re-exported)
+from .verdicts import VERDICTS, _KEY, close, echoes, negatives, pending, queued, record_verdicts, reopen, set_status  # noqa: F401  (re-exported)
 
 # Only config can be imported at module level: this module is loaded through
 # the plugin registry, which can happen while db / analyze / digest are still
@@ -70,39 +74,6 @@ SAID_KIND = "task"            # what the drawer's ✓ / ✕ act on (said_mark)
 WORKERS = analyzer.WORKERS   # one number, owned by analyzer.py
 CONTEXT_MIN = 30          # minutes of speech shown either side of the window
 
-# The four kinds. **A destination need not read this**; it exists on Umbra's
-# side so you can look back at what was sent. A value outside these four is not
-# guessed at — it is recorded as unknown.
-TYPES = ("question", "errand", "followup", "idea")
-
-# Work / personal. **Used only to filter at send time, never in extraction** —
-# "no reminders for work" holds today and may not tomorrow, and written into the
-# prompt it could not be undone with one line of config.
-DOMAINS = ("work", "personal")
-
-# The separators are this lane's own, not digest's constants: each lane must be
-# able to reword its own without touching the other — the reason they are
-# separate — and one shared string would be a hidden wire between them. They are
-# also part of the cache key: rewording one re-runs every cached day of this lane.
-TARGET_MARK = "───── the stretch you are judging starts here ─────"
-AFTER_MARK = "───── context after that stretch ─────"
-
-# ── Echoes ────────────────────────────────────────────────────
-# Some people dictate tasks to an agent by voice. The moment it is said aloud the
-# work **is already under way** — extracting it and pushing it back as a to-do
-# turns the day's finished work into cards. Measured: on one day, 31 of 32
-# proposals were that.
-#
-# The parameters were measured (two days), not guessed:
-#   delay   median 1 minute, max 18          → window ±20
-#   score   bimodal both days, split at 36%↔1% and 45%↔29% → threshold 0.35
-ECHO_WINDOW_MIN = 20
-ECHO_THRESHOLD = 0.35
-ECHO_GRAM = 3
-# A quote shorter than this is never judged an echo: a few characters make few
-# grams, and any long text may cover them by chance. Better to miss an echo
-# than to kill a real task.
-ECHO_MIN_CHARS = 8
 
 # ── Context on the card ───────────────────────────────────────
 # Given one sentence, the reader cannot recognise what they were talking about —
@@ -120,19 +91,7 @@ CONTEXT_WIN_MIN = 10
 # becomes an outer guard: a sentence after half an hour of silence is not
 # context.
 CONTEXT_MAX_LINES = 8
-QUOTE_MARK_ZH = "  ⟵ 就是这句"
-QUOTE_MARK_EN = "  ⟵ this one"
 
-# ── Two recordings of one sentence ────────────────────────────
-# With the wearable and Plaud Desktop both running in a meeting, one sentence
-# has two transcripts. The cost is not looks: it is half of context_max_lines'
-# eight-line budget. The measurements behind the threshold are in
-# importers/plaud.py, beside the code that does the merging.
-DEDUPE_THRESHOLD = 0.9
-DEDUPE_MIN_CHARS = 8  # shorter than this (whitespace removed) never merges
-# The time gate is in **seconds**: measured, the two tracks align within 1.4 s,
-# and ±5 s leaves 3.5× margin (see importers/plaud.py).
-DEDUPE_NEAR_MS = 5000
 
 # ── One task, said twice ──────────────────────────────────────
 # A thing that matters comes up more than once — "I need to book the car in",
@@ -145,101 +104,6 @@ DEDUPE_NEAR_MS = 5000
 # round found something new: one short call over the day's titles, not one per
 # window. The later one is held as `duplicate`, shown faded, and Undo brings
 # it back — a wrong merge is visible and reversible, not lost.
-
-# ── Hardware marks ────────────────────────────────────────────
-# The button pressed mid-recording. It is **the only direct human input** in the
-# whole chain — confidence is the model grading itself, speakers is inferred
-# from the room, echo_score is a text comparison: all guesses. So a mark
-# overrides those gates rather than sitting beside them.
-#
-# But it means "probably something here, look twice", not "certainly something
-# here", and certainly not "only here" — scanning only marked windows would
-# reduce the system to a manual notepad.
-MARK_NEAR_MIN = 5     # how close a proposal must be to a mark to count as marked.
-                      # The whole window would dilute "this moment" into a
-                      # 30-minute label.
-
-
-PROMPT_ZH = """下面是一个人 {day} 随身录音的逐字稿片段。**只判断分隔线之后
-那一段**，它前后的内容只是上下文，帮你听懂在说什么，不要从里面抽任务。
-
-找出他在这段话里露出来的、之后要处理的事，分四类：
-
-  question  他撞上一个没弄清的问题。判据是**他真的不知道，而且这个答案
-            查得到**。「这个接口为什么返回 403，我也不知道」算；
-            「他怎么能这么想呢」不算 —— 那是感慨，不是真在问。
-  errand    要去办的具体事情：订、买、交、约、改、发、取消。
-  followup  对**别人**许下的承诺：「我回头把那个发给你」。
-  idea      想做但还没定下来的事：「也许该做个 X」。**明确要求记下来的
-            也算**：「这个是个不错的 idea，帮我记一下」—— 值不值得做他
-            已经替你判断过了，你只要把它记准。
-
-录音会录到身边所有人。**只抽戴录音笔的这个人自己要处理的事**：他自己说
-要做的，或者别人当面让他做的。旁边的人在说他们自己的安排、电视或视频里
-的人在说话，都不是他的任务。分不清是谁的事，就别输出。
-
-不确定就别输出。**宁可漏，不要编** —— 每一条都会变成一件推到他面前、
-要他伸手处理的事，编出来的那条比漏掉的那条贵得多。
-
-quote 必须从分隔线之后的原文**逐字照抄**，一个字都不能改、不能顺。
-改过的引文核对不了，那条提案也就没用了。
-
-输出 JSON 数组，没有就输出 []：
-{{"time":"HH:MM","type":"question|errand|followup|idea",
-  "domain":"work|personal",
-  "task":"一句话说清要做什么，用中文写","quote":"逐字原文","confidence":"high|medium|low"}}
-
-task 一律用中文写，不管原话是什么语言；quote 照抄原文，不翻译。
-
-只输出 JSON，不要别的。
-{marks}
-{text}"""
-
-PROMPT_EN = """Below is an excerpt from a person's wearable recorder for {day}.
-**Judge only the part after the divider** — what surrounds it is context to
-help you follow the conversation; never take a task from it.
-
-Find the things they revealed they'll need to deal with later, in four kinds:
-
-  question  they hit something they haven't figured out. The test is that
-            they genuinely don't know AND the answer is findable. "Why does
-            that endpoint return 403, I have no idea" counts; "how could he
-            possibly think that" does not — that's a sigh, not a question.
-  errand    a concrete thing to do: book, buy, file, schedule, change, send.
-  followup  a promise made to **someone else**: "I'll send you that later".
-  idea      something they want to do but haven't decided on. **An explicit
-            "note this down for me" counts too** — "that's a good idea, note
-            this down": they have already judged it worth keeping; your job is
-            only to record it accurately.
-
-The recorder hears everyone nearby. **Only take what the wearer has to deal
-with**: what they said they would do, or what someone asked them to do. People
-nearby talking about their own plans, or someone on a TV or video, are not the
-wearer's tasks. If you cannot tell whose it is, output nothing.
-
-If unsure, output nothing. **Prefer missing one over inventing one** — every
-item becomes a thing pushed in front of them to act on, and an invented one
-costs far more than a missed one.
-
-`quote` must be copied **verbatim** from the text after the divider — not a
-word changed or tidied. A reworded quote can't be checked against anything.
-
-Output a JSON array, or [] if there are none:
-{{"time":"HH:MM","type":"question|errand|followup|idea",
-  "domain":"work|personal",
-  "task":"one sentence saying what needs doing, in English","quote":"verbatim","confidence":"high|medium|low"}}
-
-Write `task` in English whatever language was spoken; `quote` stays exactly as
-said, untranslated.
-
-Output only JSON.
-{marks}
-{text}"""
-
-
-def _prompt() -> str:
-    from ... import infer
-    return PROMPT_ZH if infer.lang() == "zh" else PROMPT_EN
 
 
 def _conf() -> dict:
@@ -312,17 +176,6 @@ def load_digests(con, day: str, model: str) -> dict:
     return analyzer.load_digests(con, DIGEST_TABLE, day, model)
 
 
-# ── Judging ───────────────────────────────────────────────────
-
-# Confidence order. **unknown is not in it** — see _above_bar.
-CONF_ORDER = ("low", "medium", "high")
-
-
-def _norm_conf(v) -> str:
-    v = (v or "").strip().lower()
-    return v if v in CONF_ORDER else "unknown"
-
-
 def _above_bar(conf: str) -> bool:
     """Good enough to send you? The bar is [actions] min_confidence in config;
     none by default.
@@ -338,200 +191,10 @@ def _above_bar(conf: str) -> bool:
     return CONF_ORDER.index(conf) >= CONF_ORDER.index(bar)
 
 
-def _owns_quote(window_text: str, quote: str) -> bool:
-    """Is this proposal **this window's** output?
-
-    Every window carries 30 minutes of context either side (to help the model
-    follow the conversation). But what is said in the context belongs to **other**
-    windows — without this, a sentence near a boundary is extracted by both
-    neighbours and becomes two identical cards. Measured: one sentence at 16:45
-    was extracted twice exactly this way.
-
-    The (day, quote) key cannot stop it: the two quotes differ by a few
-    characters (one picked up a trailing particle), so the keys differ. The right
-    place to stop it is ownership, not deduplication.
-
-    A quote found nowhere (the model smoothed out filler words) **counts**: a
-    miss costs more than a duplicate, and the window that owns the sentence
-    would extract it too — the worst case is two cards, not none.
-    """
-    q = (quote or "").strip()
-    if not q:
-        return False
-    target = window_text.split(TARGET_MARK, 1)[-1].split(AFTER_MARK, 1)[0]
-    if q in target:
-        return True
-    return q not in window_text
-
-
-MARK_BLOCK_ZH = """
-── 他在这段按了标记 ──────────────────────────────────────
-录音中途他短按了设备上的键。这通常意味着**这里有该办的事** ——
-请更仔细地看这一段，别放过一句带过的交代。
-
-但没有就是没有：**不要**为了对得起这个标记编一条出来。宁可这一段
-输出空数组。
-
-设备自己在标记点做的摘要（可能有出入，以逐字稿为准）：
-{summary}
-"""
-
-MARK_BLOCK_EN = """
-── They pressed the marker here ──────────────────────────
-They short-pressed the button on the device mid-recording. That usually
-means **there is something to be done here** — read this stretch more
-carefully and don't skip a commitment made in passing.
-
-But absent is absent: do **not** invent one to justify the marker. An
-empty array for this stretch is fine.
-
-The device's own summary at the marker (may be off; the transcript wins):
-{summary}
-"""
-
-
-def marks_in(events, a: int, b: int, lo_ms: int) -> list[dict]:
-    """Hardware marks within the target stretch [a, b). Marks in the context do
-    not count — the same rule as quote ownership: a mark belongs to its window."""
-    out = []
-    for e in events:
-        if e.get("source") != "plaud" or e.get("kind") != "mark":
-            continue
-        m = (e["ts"] - lo_ms) // 60000
-        if a <= m < b:
-            out.append({**e, "_min": m})
-    return sorted(out, key=lambda x: x["_min"])
-
-
-def render_marks(marks: list[dict]) -> str:
-    """Marks → their section of the prompt. No marks returns an empty string
-    (the section does not appear)."""
-    if not marks:
-        return ""
-    from ... import render as R, infer
-    lines = []
-    for m in marks:
-        head = f"{R.hm(m['_min'])} {m.get('title') or ''}".rstrip()
-        lines.append(head)
-        for row in (m.get("content") or "").splitlines():
-            if row.strip():
-                lines.append(f"    {row.strip()}")
-    tpl = MARK_BLOCK_ZH if infer.lang() == "zh" else MARK_BLOCK_EN
-    return tpl.format(summary="\n".join(lines))
-
-
-def _norm_domain(v) -> str:
-    return v if (v := (v or "").strip().lower()) in DOMAINS else "unknown"
-
-
-def _speakers_in(events, lo_ms: int, a: int, b: int) -> int:
-    """How many distinct speakers in [a, b).
-
-    **Counted locally, never asked of the model** — it is a deterministic fact,
-    and handing it to a model costs money and gets it wrong.
-
-    **The maximum across recordings**, not the union. Speaker labels are per
-    recording and mean nothing across recordings, which rules out both obvious
-    ways: counting labels makes two tracks' "Speaker 1" collide (four people
-    counted as two); counting (file_id, label) counts one person once per track
-    (measured: a nine-person meeting, nine labels on each of two tracks, union 18).
-
-    Why the maximum: two tracks are independent diarizations of one scene, and
-    neither recorded anyone extra — there were at least as many people as the
-    track that heard most. In a meeting on headphones the wearable hears only you
-    and the software hears four remote voices; the answer is 4.
-
-    ⚠️ The claims lane's MIN_SPEAKERS gate counts the same thing; change both.
-    """
-    per: dict = {}
-    for e in events:
-        if not (a <= (e["ts"] - lo_ms) // 60000 < b):
-            continue
-        if not (e.get("text") or "").strip():
-            continue
-        per.setdefault(e.get("file_id"), set()).add(e.get("speaker") or "?")
-    return max((len(v) for v in per.values()), default=0)
-
-
-def _norm_type(v) -> str:
-    """An unrecognised kind is not guessed at. A guess invents information, and a
-    wrong one only pollutes looking back at what was sent."""
-    v = (v or "").strip().lower()
-    return v if v in TYPES else "unknown"
-
-
-def _grams(s: str, n: int = ECHO_GRAM) -> set:
-    from ... import analyzer
-    return analyzer.grams(s, n)
-
-
-def echo_score(quote: str, cands, window=None, at=None) -> float:
-    """How much of this quote falls inside some nearby text. 0..1.
-
-    **Coverage, not Jaccard.** The agent prompt is often much longer than the
-    sentence (links added, context filled in, a template mixed in), and Jaccard
-    is diluted by length so real echoes fail to match. The question is "how much
-    of the quote does that text cover", one way.
-
-    **Not literal containment.** Dictation garbles words — a product name heard
-    as something else (say, "Kestrel" as "custard"). Measured,
-    literal containment caught almost none; 3-grams caught them all.
-    """
-    return echo_match(quote, cands, window=window, at=at)[0]
-
-
-def echo_match(quote: str, cands, window=None, at=None) -> tuple:
-    """(score, the text it matched). The text is kept so the call can be
-    checked afterwards."""
-    q = (quote or "").strip()
-    if len(q.replace(" ", "")) < ECHO_MIN_CHARS:
-        return 0.0, None
-    qg = _grams(q)
-    if not qg:
-        return 0.0, None
-    win = ECHO_WINDOW_MIN if window is None else window
-    best = (0.0, None)
-    for m, text in cands:
-        if at is not None and abs(m - at) > win:
-            continue
-        g = _grams(text or "")
-        if not g:
-            continue
-        sc = len(qg & g) / len(qg)
-        if sc > best[0]:
-            best = (sc, text)
-    return best
-
-
 def echo_threshold() -> float:
     """0 or less turns the echo filter off."""
     v = (_conf().get("actions") or {}).get("echo_threshold")
     return float(v) if isinstance(v, (int, float)) else ECHO_THRESHOLD
-
-
-def same_utterance(a: str, b: str) -> float:
-    """How much two texts look like the same sentence. 0..1.
-
-    **Containment (how much of the shorter lies in the longer), not Jaccard.**
-    Two tracks split sentences differently as a rule; one cuts a sentence in two
-    and the other does not, so the longer piece has extra, and Jaccard's union
-    denominator punishes that — measured, it missed more than half the real
-    duplicates. The question is "is the short one wholly covered by the other".
-
-    Same direction and same 3-grams as echo_score; echo_score always takes the
-    quote as numerator, this takes the shorter.
-
-    ⚠️ The measure **is only trustworthy on long enough samples**. A short
-    sentence has few grams, and they scatter into any long one for a high score
-    (a real false merge: a five-character "uh, I'm on it" scored 0.75 against an
-    unrelated turn). The length gate is in dedupe_recordings — the measure
-    answers "how alike", and "is this sample worth trusting" is another question;
-    mixing them makes both unclear.
-    """
-    ga, gb = _grams(a or ""), _grams(b or "")
-    if not ga or not gb:
-        return 0.0
-    return len(ga & gb) / min(len(ga), len(gb))
 
 
 def dedupe_threshold() -> float:
@@ -583,123 +246,9 @@ def dedupe_recordings(rows: list[dict], quote: str = "") -> tuple:
     return kept, merged
 
 
-def echo_pool(events, lo_ms: int) -> list[tuple]:
-    """The candidates: agent prompts plus clipboard text.
-
-    The clipboard is the stronger evidence, measured: on one day five quotes
-    matched only 4% on the agent side and 61–90% on the clipboard. The clipboard
-    holds the dictation tool's near-verbatim, unedited text; the copy in the
-    agent's history has often been edited once already.
-    """
-    out = []
-    for e in events:
-        src, kind = e.get("source"), e.get("kind")
-        if src in ("butler", "claude") or (src == "live" and kind == "clip"):
-            text = (e.get("text") or "").strip()
-            if text:
-                out.append(((e["ts"] - lo_ms) // 60000, text))
-    return out
-
-
-def _minute_of(hhmm, fallback: int) -> int:
-    """The model's HH:MM → minute of the day. If it cannot say, the window's
-    start — half an hour off does not change a ±20-minute judgement."""
-    try:
-        h, m = str(hhmm).split(":")
-        return int(h) * 60 + int(m)
-    except (ValueError, AttributeError, TypeError):
-        return fallback
-
-
-PLUGIN = "actions"
-
-
 def _self():
     import sys
     return sys.modules[__name__]
-
-
-# ── One record shape over two stores ──────────────────────────
-#
-# Proposals found before this lane moved onto the core store are in the frozen
-# `proposals` table; everything since is in analyzer_items. Both are read, and
-# every function below works on records in the old table's vocabulary — one
-# path through the logic, store-aware only where a record is written back.
-#
-# Frozen means no new findings go there. The lifecycle of findings already
-# there continues in place: a proposal queued before the move is still sent,
-# and your verdict on it still lands on it. Ids never collide — new finding ids
-# start above every id the old table used (db.items_after_legacy) — so an id
-# alone says which store a record lives in.
-
-_LEGACY_COLS = ("id, day, t, task, quote, status, type, confidence, domain, "
-                "marked, speakers, echo_score, echo_text, win_a, dispatch_id, "
-                "verdict, verdict_note, result, model, created_ms")
-
-
-def records(con, day: str | None = None, status=None) -> list[dict]:
-    """Every proposal, old and new, as one list in the old table's shape."""
-    q, args = f"SELECT {_LEGACY_COLS} FROM proposals", []
-    if day is not None:
-        q += " WHERE day=?"
-        args.append(day)
-    keys = [k.strip() for k in _LEGACY_COLS.split(",")]
-    out = [dict(zip(keys, r), src="legacy") for r in con.execute(q, args)]
-    for it in analyzer.load_items(con, PLUGIN, day=day):
-        m = it["meta"]
-        out.append({
-            "id": it["id"], "day": it["day"], "t": it.get("t"),
-            "task": it.get("task") or "", "quote": it["key"],
-            "status": it["state"], "type": it.get("type"),
-            "confidence": it.get("confidence"), "domain": it.get("domain"),
-            "marked": 1 if it.get("marked") else 0,
-            "speakers": it.get("speakers"),
-            "echo_score": it.get("echo_score"), "echo_text": it.get("echo_text"),
-            "win_a": it["win_a"], "dispatch_id": m.get("dispatch_id"),
-            "verdict": m.get("verdict"), "verdict_note": m.get("verdict_note"),
-            "result": m.get("result"), "model": it["model"],
-            "dup_of": m.get("dup_of"),
-            "created_ms": it["at_ms"], "src": "item"})
-    if status is not None:
-        want = {status} if isinstance(status, str) else set(status)
-        out = [r for r in out if r["status"] in want]
-    out.sort(key=lambda r: (r["day"], r["t"] or "", r["id"]))
-    return out
-
-
-def record(con, pid: int) -> dict | None:
-    got = con.execute(f"SELECT {_LEGACY_COLS} FROM proposals WHERE id=?",
-                      (pid,)).fetchone()
-    if got:
-        keys = [k.strip() for k in _LEGACY_COLS.split(",")]
-        return dict(zip(keys, got), src="legacy")
-    it = analyzer.get_item(con, PLUGIN, pid)
-    if it is None:
-        return None
-    return next((r for r in records(con, day=it["day"]) if r["id"] == pid), None)
-
-
-def _write(con, pid: int, status: str, expect=None, **fields) -> bool:
-    """Move one proposal, in whichever store it lives. Returns whether it moved.
-
-    expect is the status it must be in; a move from anywhere else is refused,
-    so a verdict that landed first is not overwritten by a late send.
-    """
-    rec = record(con, pid)
-    if rec is None:
-        return False
-    if expect is not None:
-        allowed = {expect} if isinstance(expect, str) else set(expect)
-        if rec["status"] not in allowed:
-            return False
-    if rec["src"] == "legacy":
-        sets = ["status=?"] + [f"{k}=?" for k in fields]
-        con.execute(f"UPDATE proposals SET {', '.join(sets)} WHERE id=?",
-                    (status, *fields.values(), pid))
-        con.commit()
-        return True
-    return analyzer.update_item(con, PLUGIN, pid, state=status,
-                                meta={k: v for k, v in fields.items()})
 
 
 # ── Scanning a day ────────────────────────────────────────────
@@ -732,36 +281,6 @@ def _bridge_cache(con, day: str, model: str) -> int:
         analyzer.mark_ran(con, PLUGIN, day, model, w["a"], w["digest"])
         n += 1
     return n
-
-
-DUP_PROMPT_EN = """These are to-dos picked out of one person's recorded day, each
-with an id and the time it was said. Some may be **the same to-do said again**
-in other words. Find those.
-
-Same means one action on one thing: "book the car service" and "remind me to
-get the car serviced" are the same. Different people, objects or dates make
-different to-dos: "send Maya the numbers" and "send Sam the numbers" are two.
-When unsure, they are different.
-
-Only the ids marked NEW may be called repeats, and only of an id said earlier.
-
-Output a JSON array of [repeat_id, earlier_id] pairs, or [] if there are none.
-Output only JSON.
-
-{items}"""
-
-DUP_PROMPT_ZH = """下面是从一个人一天的录音里抽出来的待办，每条带 id 和说的时间。
-其中可能有**同一件事换个说法又说了一遍**的。把这些找出来。
-
-同一件事，指对同一个对象做同一个动作：「约车保养」和「提醒我去做汽车保养」
-是同一件。对象、人或日期不同就是两件：「把数字发给小王」和「把数字发给小李」
-是两件。拿不准就当成不同。
-
-只有标了 NEW 的 id 可以被判成重复，而且只能是更早那条的重复。
-
-输出 JSON 数组，每项是 [重复的 id, 更早的 id]；没有就输出 []。只输出 JSON。
-
-{items}"""
 
 
 def mark_duplicates(con, day: str, ids, call=None, model: str | None = None,
@@ -954,43 +473,6 @@ def transcript_excerpt(con, day: str, minute: int, quote: str,
     if merged:
         kept.append(_card("merged").format(merged))
     return "\n".join(kept)
-
-
-# The card's own words, per language. Send-time text, not a cache key: changing
-# these re-runs nothing. The zh wording is what the lane always sent.
-_CARD_TEXT = {
-    "zh": {"origin": "── 出处 ", "doing": "当时在：{}{}", "with": "（和{}一起）",
-           "no_infer": "当时在做什么：这一天还没推断过（umbra infer 没跑到这天）",
-           "said": "他的原话：「{}」", "around": "── 前后的录音 ",
-           "around_note": "（随身录音的自动转写，**可能有听错的字**；"
-                          "上面那条任务如果读着别扭，先看这段原文再判断）",
-           "ask": "如果这件事缺了上下文没法做，先说你缺什么，别猜。",
-           "before": "…（前面略去 {} 句）", "after": "…（后面略去 {} 句）",
-           "merged": "…（合并了 {} 句两条录音都录到的重复）"},
-    "en": {"origin": "── Where this came from ", "doing": "Doing at the time: {}{}",
-           "with": " (with {})",
-           "no_infer": "Doing at the time: this day has not been inferred yet "
-                       "(umbra infer has not reached it)",
-           "said": "Their words: \"{}\"", "around": "── The recording around it ",
-           "around_note": "(automatic transcription from a wearable recorder — "
-                          "**some words may be misheard**; if the task above reads "
-                          "oddly, read this before judging)",
-           "ask": "If this cannot be done without more context, say what is "
-                  "missing first; don't guess.",
-           "before": "… ({} earlier lines omitted)", "after": "… ({} later lines omitted)",
-           "merged": "… ({} lines captured by both recordings merged)"},
-}
-
-
-def _card(key: str) -> str:
-    from ... import infer
-    return _CARD_TEXT["zh" if infer.lang() == "zh" else "en"][key]
-
-
-def quote_mark() -> str:
-    """The marker on the quoted line of the excerpt, in the card's language."""
-    from ... import infer
-    return QUOTE_MARK_ZH if infer.lang() == "zh" else QUOTE_MARK_EN
 
 
 def item_prompt(con, day: str, t: str | None, task: str, quote: str) -> str:
@@ -1200,50 +682,6 @@ def dispatch(con, log=print, today: str | None = None) -> int:
     return sent
 
 
-# ── What you tapped, coming back ──────────────────────────────
-
-_KEY = re.compile(r"^umbra:(\d{4}-\d{2}-\d{2}):(\d+)$")
-
-# The three buttons at the destination → the local state.
-#
-# "Already done" and "not a task" both close a proposal, but **only the second
-# means extraction was wrong**. Already done means it was extracted perfectly and
-# is merely stale — mixing it into the negatives would teach the model to miss
-# that kind of real task. The two buttons sit close together in the UI; here
-# they must stay far apart.
-VERDICTS = {"ran": "approved",
-            "not_a_task": "dismissed",
-            "already_done": "dismissed"}
-
-
-def record_verdicts(con, items) -> int:
-    """Match what was tapped at the destination back to local proposals, by
-    externalEventKey.
-
-    Keys that are not recognised are skipped quietly — the destination also holds
-    tasks from other sources, with keys in other shapes, and that is not an
-    error.
-    """
-    n = 0
-    for it in items or []:
-        m = _KEY.match(str((it or {}).get("externalEventKey") or ""))
-        if not m:
-            continue
-        verdict = (it.get("verdict") or "").strip()
-        status = VERDICTS.get(verdict)
-        if not status:
-            continue
-        pid = int(m.group(2))
-        rec = record(con, pid)
-        if rec is None or rec["day"] != m.group(1):
-            continue
-        if _write(con, pid, status, verdict=verdict,
-                  verdict_note=it.get("verdictNote")):
-            n += 1
-    con.commit()
-    return n
-
-
 def pull_verdicts(con, log=print) -> int:
     """Collect what you tapped. Returns how many verdicts landed.
 
@@ -1267,75 +705,6 @@ def pull_verdicts(con, log=print) -> int:
         log(f"  ✗ could not collect verdicts: {e}")
         return 0
     return record_verdicts(con, [i for i in items if i])
-
-
-def close(con, pid: int, verdict: str) -> bool:
-    """A verdict given here rather than at the destination — the page's ✓ and
-    ✕, for anyone whose sink only receives. Same two words, same meaning:
-    only not_a_task is an extraction error and lands in negatives().
-
-    Only an open proposal closes; one already closed keeps the verdict it
-    has. A proposal closed before it was sent is never sent: dispatch takes
-    only `proposed`.
-    """
-    if verdict not in ("already_done", "not_a_task"):
-        raise ValueError(f"unknown verdict {verdict!r}")
-    return _write(con, pid, VERDICTS[verdict], expect=("proposed", "dispatched"),
-                  verdict=verdict, verdict_note="marked on the page")
-
-
-def reopen(con, pid: int) -> bool:
-    """Undo close() or a duplicate hold: back to sent if it had gone out,
-    else to proposed."""
-    rec = record(con, pid)
-    if rec is None or rec["status"] not in ("dismissed", "duplicate"):
-        return False
-    back = "dispatched" if rec.get("dispatch_id") else "proposed"
-    return _write(con, pid, back, expect=("dismissed", "duplicate"),
-                  verdict=None, verdict_note=None)
-
-
-def negatives(con, limit: int = 50) -> list[dict]:
-    """The negatives: the ones you explicitly marked "not a task".
-
-    Only recorded for now — using them to change the prompt is another matter,
-    which needs enough samples to see which phrasings the false extractions
-    cluster in. Putting a handful into the prompt early would calibrate an
-    unmeasured bias against noise.
-    """
-    rows = [r for r in records(con) if r["verdict"] == "not_a_task"]
-    rows.sort(key=lambda r: (r["day"], r["t"] or ""), reverse=True)
-    return [{"day": r["day"], "t": r["t"], "task": r["task"], "quote": r["quote"],
-             "type": r["type"], "note": r["verdict_note"]} for r in rows[:limit]]
-
-
-# ── Local state, and the old local outlet ─────────────────────
-
-def queued(con) -> int:
-    """How many proposals are waiting to go out, whatever max_per_run lets
-    through in one round."""
-    return len(records(con, status="proposed"))
-
-
-def echoes(con) -> list[dict]:
-    """Proposals held back as echoes: said aloud while dictating the same thing
-    to an agent. Kept so "found and held back" stays distinguishable from
-    "never found"."""
-    rows = sorted(records(con, status="echo"),
-                  key=lambda r: (r["day"], r["t"] or ""))
-    rows.sort(key=lambda r: r["day"], reverse=True)
-    return [{"day": r["day"], "t": r["t"], "task": r["task"], "quote": r["quote"],
-             "score": r["echo_score"] or 0, "match": r["echo_text"] or ""}
-            for r in rows]
-
-
-def pending(con) -> list[tuple]:
-    return [(r["id"], r["day"], r["t"], r["task"], r["quote"], r["type"],
-             r["status"]) for r in records(con, status=("proposed", "dispatched"))]
-
-
-def set_status(con, pid: int, status: str, result: str | None = None):
-    _write(con, pid, status, result=result)
 
 
 def make_sink():
