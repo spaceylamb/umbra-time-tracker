@@ -1,10 +1,11 @@
 // The page does exactly one subtraction; the rule is Python's (viz.stale_fields).
 import type { Freshness, Meta } from "../api/types";
+import { clock } from "./demo";
 
-export const isStale = (f: Freshness, now = Date.now()) =>
+export const isStale = (f: Freshness, now = clock()) =>
   f.bad || (f.check_ts != null && now - f.check_ts > f.stale_min * 60000);
 
-export function status(meta: Meta, now = Date.now()) {
+export function status(meta: Meta, now = clock()) {
   const runs = meta.fresh.filter((f) => !f.live && f.last_run != null);
   const last = runs.length ? Math.max(...runs.map((f) => f.last_run!)) : null;
   return {

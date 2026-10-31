@@ -1,3 +1,5 @@
+import { clock } from "./demo";
+
 export const hm = (m: number) =>
   `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(Math.floor(m % 60)).padStart(2, "0")}`;
 
@@ -35,7 +37,7 @@ export const shortDate = (iso: string) => {
 
 export const hours = (min: number) => `${(min / 60).toFixed(1)}h`;
 
-export function ago(ms: number, now = Date.now()) {
+export function ago(ms: number, now = clock()) {
   const m = Math.max(0, Math.round((now - ms) / 60000));
   if (m < 1) return "just now";
   if (m < 60) return `${m}m ago`;

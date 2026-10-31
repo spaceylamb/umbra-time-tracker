@@ -8,9 +8,11 @@
 import { queryOptions } from "@tanstack/react-query";
 import type { Config, Day, DayDetail, ImportProgress, Meta, Raw, Said, Settings, Setup, Started, Week } from "./types";
 
-type Static = { inline?: Record<string, unknown> };
+type Static = { inline?: Record<string, unknown>; demo?: { now: number; link: string } };
 export const STATIC: Static | undefined = (window as unknown as { __UMBRA_STATIC__?: Static }).__UMBRA_STATIC__;
-export const READ_ONLY_NOTE = "This is the exported copy — changes are made in Umbra on your Mac.";
+export const READ_ONLY_NOTE = STATIC?.demo
+  ? "This is a demo — nothing here can be changed."
+  : "This is the exported copy — changes are made in Umbra on your Mac.";
 
 async function get<T>(path: string): Promise<T> {
   if (STATIC) {

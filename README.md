@@ -11,6 +11,10 @@
   <a href="https://github.com/spaceylamb/umbra-time-tracker/actions/workflows/test.yml"><img src="https://github.com/spaceylamb/umbra-time-tracker/actions/workflows/test.yml/badge.svg" alt="test"></a>
 </p>
 
+<p align="center">
+  <a href="https://spaceylamb.github.io/umbra-time-tracker/"><b>Live demo</b></a> — three made-up weeks, nothing to install
+</p>
+
 https://github.com/user-attachments/assets/42345787-bee5-4efe-b78c-6bb3a4f3c060
 
 Pull your scattered digital footprints onto one timeline, and let an AI
@@ -87,7 +91,8 @@ one exception is PLAUD: its authorisation comes from PLAUD's own CLI
 (`npm i -g @plaud-ai/cli && plaud login`), so connecting a recorder needs
 npm once; Umbra renews the token after that.
 
-**Just want to look?** No API key and no data of your own needed:
+**Just want to look?** Open the [live demo](https://spaceylamb.github.io/umbra-time-tracker/), or run the same three
+weeks here — no API key and no data of your own needed:
 
 ```bash
 python3 -m umbra.devseed /tmp/umbra-demo

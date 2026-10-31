@@ -17,6 +17,7 @@ import { catName } from "../lib/day";
 import { PhonePriorities } from "../week/Priorities";
 import { DatePicker } from "./DatePicker";
 import { MarkRow, Metrics, PhoneNav, TabBar, TAB_PAD } from "./Shell";
+import { demo } from "../lib/demo";
 
 const NUM = ["no", "one", "two", "three", "four", "five", "six", "seven"];
 
@@ -62,7 +63,7 @@ export function MobileWeek({ meta, week, days, data, soFar, stopped, cur, curV =
       <PhoneNav title={weekTitle(days)} onPick={() => setPicking(true)}
         prev={canPrev ? { to: "/week/$week", params: { week: shiftWeek(week.week, -1) }, label: "Previous week" } : undefined}
         next={canNext ? { to: "/week/$week", params: { week: shiftWeek(week.week, 1) }, label: "Next week" } : undefined}
-        live={!!last} status={`${span} · ${last ? `updated ${ago(last)}` : "never updated"}`} />
+        live={!!last} status={demo() ? "" : `${span} · ${last ? `updated ${ago(last)}` : "never updated"}`} />
 
       <div className="px-4 pt-[18px] pb-[22px]"><Metrics meta={meta} mins={cur} judged={judged} /></div>
 

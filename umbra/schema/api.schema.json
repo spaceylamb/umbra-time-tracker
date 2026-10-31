@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/sherwinx/umbra-time-tracker/umbra/schema/api.schema.json",
+  "$id": "https://github.com/spaceylamb/umbra-time-tracker/umbra/schema/api.schema.json",
   "title": "Umbra serve API",
   "description": "The one contract between umbra serve (Python) and the web frontend (TypeScript). TS types are generated from this file; Python validates against it in tests with umbra/schema/validate.py. Shapes are the viz payload, cut where viz.py cuts RESIDENT from ONDEMAND.",
   "$defs": {

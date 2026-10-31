@@ -90,10 +90,10 @@ export function PhoneNav({ title, onPick, prev, next, status, live }: {
         </button>
         {step(next, "›", "Nothing later yet")}
       </div>
-      <div className="flex items-center gap-[5px] font-mono text-2xs leading-[14px] text-ink-subtle">
+      {status && <div className="flex items-center gap-[5px] font-mono text-2xs leading-[14px] text-ink-subtle">
         <i className={`size-1 rounded-full ${live ? "bg-live" : "bg-ink-subtle"}`} />
         {status}
-      </div>
+      </div>}
     </div>
   );
 }

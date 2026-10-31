@@ -88,10 +88,12 @@ def payloads(raw_days: int | None = None):
         con.close()
 
 
-def _index(inline: dict | None = None) -> str:
+def _index(inline: dict | None = None, demo: dict | None = None) -> str:
     with open(os.path.join(WEB, "index.html"), encoding="utf-8") as f:
         html = f.read()
     flag = ({"inline": inline} if inline is not None else {})
+    if demo is not None:
+        flag["demo"] = demo
     # </script> inside the JSON would end the tag early.
     js = json.dumps(flag, ensure_ascii=False).replace("</", "<\\/")
     # After <meta charset>, never before it: a browser only honours the charset
@@ -106,10 +108,14 @@ def _index(inline: dict | None = None) -> str:
     return html.replace("<head>", "<head>" + tag, 1)
 
 
-def write(out: str, raw_days: int | None = None, ours: bool = False) -> dict:
+def write(out: str, raw_days: int | None = None, ours: bool = False,
+          demo: dict | None = None) -> dict:
     """Write the static site into `out` (replacing what an earlier export put
     there). ours=True: `out` is a directory Umbra owns (viz.SITE_DIR) — it
-    may still hold what an older version deployed, which is safe to clear. Returns {"files": n, "bytes": n}."""
+    may still hold what an older version deployed, which is safe to clear.
+    demo: only devseed.site passes it — the public demo's flag, whose `now`
+    (epoch ms) is where the page's clock stands still; without one, the
+    moment of this export. Returns {"files": n, "bytes": n}."""
     if not os.path.exists(os.path.join(WEB, "index.html")):
         raise FileNotFoundError("the page has not been built (bun run --cwd web build)")
     # Only ever clear a directory an earlier export made — never a directory
@@ -126,10 +132,12 @@ def write(out: str, raw_days: int | None = None, ours: bool = False) -> dict:
     shutil.copytree(os.path.join(WEB, "assets"), os.path.join(out, "assets"))
     n = size = 0
     for path, obj in payloads(raw_days):
+        if path == "/api/meta" and demo is not None and "now" not in demo:
+            demo = {**demo, "now": obj["built_ms"]}
         size += _write(out, path, obj)
         n += 1
     with open(os.path.join(out, "index.html"), "w", encoding="utf-8") as f:
-        f.write(_index())
+        f.write(_index(demo=demo))
     return {"files": n, "bytes": size}
 
 

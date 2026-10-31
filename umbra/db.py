@@ -772,9 +772,12 @@ FAIL_STREAK = 2
 
 
 def record_import(con: sqlite3.Connection, source: str, ok: bool,
-                  added: int = 0, error: str | None = None) -> None:
+                  added: int = 0, error: str | None = None,
+                  at: int | None = None) -> None:
+    """at: when the run happened (epoch ms); now unless given — only the
+    public demo (devseed.site) gives it, so its imports sit at one moment."""
     import time
-    now = int(time.time() * 1000)
+    now = int(time.time() * 1000) if at is None else at
     con.execute(
         "INSERT INTO imports (source, last_run, ok, added, error, last_ok, fails) "
         "VALUES (?,?,?,?,?,?,?) "

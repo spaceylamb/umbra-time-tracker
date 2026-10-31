@@ -16,6 +16,7 @@ import { Topbar } from "../day/Topbar";
 import { Button } from "../ui/Button";
 import { useMobile } from "../lib/mobile";
 import { MobileSources } from "../mobile/MobileSources";
+import { clock as readerNow } from "../lib/demo";
 
 export type Src = Setup["sources"][number];
 
@@ -44,7 +45,7 @@ export function clock(ms: number | null | undefined, day: string) {
 export function NeedsCard({ f, s, retry, phone = false }: {
   f: Freshness; s?: Src; retry: (name: string) => void; phone?: boolean;
 }) {
-  const now = Date.now();
+  const now = readerNow();
   const lines: [string, string][] = [];
   let why = "";
   if (f.live) {
