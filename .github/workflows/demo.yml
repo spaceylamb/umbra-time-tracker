@@ -1,0 +1,44 @@
+# The public demo: devseed's three made-up weeks, exported as a static site and
+# published to GitHub Pages on every push to main. Nothing here reads real data:
+# `umbra.devseed --site` seeds a throwaway home and exports from there.
+name: demo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # macOS, so the Sources page reads like a Mac with Umbra just installed: on
+    # Linux, five sources would say they only exist on macOS.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Build the demo site
+        run: python -m umbra.devseed --site _site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

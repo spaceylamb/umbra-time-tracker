@@ -8,6 +8,7 @@ import { Button } from "../ui/Button";
 import { ago } from "../lib/time";
 import { status } from "../lib/fresh";
 import { useStuck } from "../lib/stuck";
+import { demo } from "../lib/demo";
 
 /** Height of the pinned topbar — what other sticky parts sit under. */
 export const TOPBAR_H = 84;   // pt-7 + the 32px nav + pb-6
@@ -74,7 +75,7 @@ export function Topbar({ meta, view = "day", date, pinned }: {
         </Link>
       </nav>
       <div className="grow" />
-      <div className="flex items-center gap-2 text-sm/tight text-ink-subtle">
+      {!demo() && <div className="flex items-center gap-2 text-sm/tight text-ink-subtle">
         {view === "sources" && stale.length > 0 && !importing ? (
           <><i className="size-[5px] rounded-full bg-alert" />
             <span className="text-ink">{stale.length} source{stale.length === 1 ? "" : "s"} need{stale.length === 1 ? "s" : ""} you</span></>
@@ -82,7 +83,7 @@ export function Topbar({ meta, view = "day", date, pinned }: {
           <><i className={`size-[5px] rounded-full ${last || importing ? "bg-live" : "bg-ink-subtle"}`} />
             {importing ?? (last ? `updated ${ago(last)}` : "never updated")}</>
         )}
-      </div>
+      </div>}
       <Button icon aria-label="Settings" onClick={() => settings()} className="text-ink-muted">
         <Gear />
       </Button>

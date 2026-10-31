@@ -18,6 +18,7 @@ import { WeekPage } from "./week/WeekPage";
 import { SourcesPage } from "./sources/SourcesPage";
 import { useTheme } from "./theme";
 import { markNavigation } from "./lib/flip";
+import { DemoStrip } from "./ui/DemoStrip";
 
 function Index() {
   const meta = useQuery(metaQuery);
@@ -32,7 +33,7 @@ function Index() {
 }
 
 const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  component: () => <Outlet />,
+  component: () => <><DemoStrip /><Outlet /></>,
 });
 
 // "/" means the newest day there is data for — not the calendar's today,

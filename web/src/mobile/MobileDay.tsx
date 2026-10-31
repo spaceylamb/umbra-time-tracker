@@ -22,6 +22,7 @@ import { anything, itemsOf, tabsOf } from "../lib/said";
 import { Sheet } from "../ui/Sheet";
 import { MarkRow, Metrics, PhoneNav, TabBar, TAB_PAD } from "./Shell";
 import { DatePicker } from "./DatePicker";
+import { demo } from "../lib/demo";
 
 type Open = { k: "event"; e: DayEvent } | { k: "said"; tab: Tab } | { k: "sources" } | { k: "date" } | null;
 
@@ -44,7 +45,7 @@ function DateRow({ meta, date, day, onPick }: { meta: Meta; date: string; day: D
       prev={prev ? { to: "/day/$date", params: { date: prev }, label: "Previous day" } : undefined}
       next={next ? { to: "/day/$date", params: { date: next }, label: "Next day" } : undefined}
       live={!!last}
-      status={`${[tzLine(day, date === meta.today), last ? `updated ${ago(last)}` : "never updated"].filter(Boolean).join(" · ")}`} />
+      status={demo() ? "" : `${[tzLine(day, date === meta.today), last ? `updated ${ago(last)}` : "never updated"].filter(Boolean).join(" · ")}`} />
   );
 }
 

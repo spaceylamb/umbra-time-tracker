@@ -216,6 +216,22 @@ differ in size use Tailwind's `sm:`.
   not judged), and only those two. Days with nothing recorded are shown, so
   the calendar stays a calendar, but can't be opened.
 
+## The public demo
+
+`python3 -m umbra.devseed --site OUT` builds the exported site from devseed's
+three made-up weeks, and `.github/workflows/demo.yml` publishes it to GitHub
+Pages on every push to `main`. It is the exported copy with two differences,
+both keyed on the flag it carries (`lib/demo.ts`):
+
+- **One line above the page** says what it is and links to the README. It
+  stands in for the topbar's "updated …", which the demo does not show.
+- **Its clock stands still** at `devseed.DEMO_NOW`, the moment its imports
+  ran. Ages are otherwise computed when the page is read; for days that were
+  never real, that would only ever say "stopped".
+
+Nothing in it needs you: devseed's expired login, there to show the Sources
+page's "Needs you", is left out of the demo.
+
 ## Writing for the page
 
 - **Say what is true and what is not**, in that order. "Every record is here

@@ -15,14 +15,20 @@ the "model" rows are written by hand to look like what one would produce.
     python3 -m umbra.devseed /tmp/umbra-dev      # then:
     UMBRA_DATA_DIR=/tmp/umbra-dev UMBRA_CONFIG_DIR=/tmp/umbra-dev umbra serve
 
+    python3 -m umbra.devseed --site OUT          # the public demo, as a static site
+
 The config it writes defines the three headline groups the page shows, chosen
 so the numbers come out round: Productivity 9.7h, Sleep 7.2h, Exercise 0.8h.
 """
 
 import datetime as dt
+import json
 import os
 import random
+import shutil
+import subprocess
 import sys
+import tempfile
 
 from . import analyze, db
 from . import inference as INF
@@ -30,6 +36,9 @@ from . import inference as INF
 DAY = "2026-09-08"
 MODEL = "gemini-3.7-flash"
 BACK = 20                       # days before DAY, for the strip
+# The public demo's one moment: its imports ran then, and its page's clock
+# stands there — the morning after DAY, once the night's records are in.
+DEMO_NOW = int(dt.datetime(2026, 9, 9, 8, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
 UNJUDGED = 2                    # this many days before DAY: no model has looked
 FAILED = 1                      # this many days before DAY: two calls failed (17c)
 FAILED_WINDOWS = [(840, 870), (870, 900)]   # 14:00-15:00
@@ -275,9 +284,10 @@ cats = ["workout"]
 """
 
 
-def seed(data_dir: str, config_dir: str | None = None) -> str:
+def seed(data_dir: str, config_dir: str | None = None, demo: bool = False) -> str:
     """Write the synthetic database under data_dir and return its path.
-    With config_dir, also write the config the page expects."""
+    With config_dir, also write the config the page expects. demo: the public
+    demo's variant — every source in order, nothing that needs you."""
     os.makedirs(data_dir, exist_ok=True)
     if config_dir:
         os.makedirs(config_dir, exist_ok=True)
@@ -315,12 +325,14 @@ def seed(data_dir: str, config_dir: str | None = None) -> str:
                 for a, b in FAILED_WINDOWS])
     _said(con, DAY)
     _goals(con)
+    at = DEMO_NOW if demo else None
     for src in ("chrome", "claude", "zsh", "git", "whoop"):
-        db.record_import(con, src, ok=True)
+        db.record_import(con, src, ok=True, at=at)
     # The Sources page's "Needs you": one source whose login expired — it worked, then
-    # three runs in a row were refused.
-    db.record_import(con, "plaud", ok=True)
-    for _ in range(3):
+    # three runs in a row were refused. Not in the demo: made-up days have
+    # nothing for a visitor to fix.
+    db.record_import(con, "plaud", ok=True, at=at)
+    for _ in range(0 if demo else 3):
         db.record_import(con, "plaud", ok=False,
                          error="401 — the stored token expired")
     con.commit()
@@ -328,7 +340,60 @@ def seed(data_dir: str, config_dir: str | None = None) -> str:
     return path
 
 
+# Where the demo's "Get Umbra" goes.
+LINK = "https://github.com/spaceylamb/umbra-time-tracker#quick-start"
+
+
+def site(out: str, home: str | None = None) -> dict:
+    """The public demo: these three weeks as a static site, flagged so the page
+    says it is a demo and its clock stands still.
+
+    Built in a child process whose home is a throwaway directory: where the
+    database and the config live is fixed when umbra is first imported, so
+    only a fresh interpreter can be pointed somewhere else — and the export
+    then writes every path as ~/…, naming nothing of the machine that built
+    it. home: that directory (made and removed here when not given)."""
+    made = home is None
+    home = home or tempfile.mkdtemp(prefix="umbra-demo-")
+    os.makedirs(home, exist_ok=True)
+    work = tempfile.mkdtemp(prefix=".demo-", dir=home)
+    try:
+        data, conf = os.path.join(work, "Umbra"), os.path.join(work, ".config", "umbra")
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("UMBRA_", "XDG_"))}
+        env.update(HOME=work, UMBRA_DATA_DIR=data, UMBRA_CONFIG_DIR=conf,
+                   PYTHONPATH=os.pathsep.join(
+                       [os.path.dirname(os.path.dirname(os.path.abspath(__file__)))]
+                       + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else [])))
+        code = ("import json, sys; from umbra import config, db, devseed; "
+                "print(json.dumps(devseed._write_site(sys.argv[1], sys.argv[2], db.DB_PATH, config.CONFIG_DIR)))")
+        argv = [sys.executable, *(["-S"] if sys.flags.no_site else []), "-c", code,
+                os.path.abspath(out), work]
+        r = subprocess.run(argv, env=env, check=True, capture_output=True, text=True)
+        return json.loads(r.stdout.strip().splitlines()[-1])
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+        if made:
+            shutil.rmtree(home, ignore_errors=True)
+
+
+def _write_site(out: str, home: str, db_path: str, config_dir: str) -> dict:
+    """The half of site() that runs in the child. seed() deletes the database
+    it is pointed at, so this refuses anything but a fresh one inside home."""
+    from . import export
+    inside = os.path.realpath(home) + os.sep
+    if not os.path.realpath(db_path).startswith(inside):
+        raise RuntimeError(f"the demo writes only inside {home}, not {db_path}")
+    if os.path.exists(db_path):
+        raise RuntimeError(f"refusing to write the demo over an existing database: {db_path}")
+    seed(os.path.dirname(db_path), config_dir=config_dir, demo=True)
+    return export.write(out, demo={"link": LINK, "now": DEMO_NOW})
+
+
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--site"] and len(sys.argv) == 3:
+        r = site(sys.argv[2])
+        print(f"{sys.argv[2]}  ({r['files']} files, {r['bytes'] / 1e6:.1f} MB) — the public demo")
+        sys.exit(0)
     d = sys.argv[1] if len(sys.argv) > 1 else "/tmp/umbra-dev"
     print(seed(d, config_dir=d))
     print(f"UMBRA_DATA_DIR={d} UMBRA_CONFIG_DIR={d} python3 -m umbra serve")
