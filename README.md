@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://spaceylamb.github.io/umbra-time-tracker/"><b>Live demo</b></a> — three made-up weeks, nothing to install
+  <a href="https://spaceylamb.github.io/umbra-time-tracker/"><b>Live demo</b></a>
 </p>
 
 https://github.com/user-attachments/assets/95f912ab-97ad-4e12-b14f-fffd040f0604
