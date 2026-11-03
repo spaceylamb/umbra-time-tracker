@@ -1,9 +1,12 @@
 """A synthetic database for developing the frontend against.
 
 The design centres on one day — Tuesday 8 September 2026 — and this writes
-that day into a database, plus the twenty days before it so the three-week
-strip has something to draw. Everything is deterministic: the same call writes
-the same rows, so screenshots of the served page are comparable across changes.
+that day into a database, plus the three whole weeks before its own, so the
+strip has something to draw and Week has weeks to page back through. The weeks
+get better as they go — late nights and hours lost to feeds early on, more of
+every priority by the end — so a comparison with last week shows a trend, not
+noise. Everything is deterministic: the same call writes the same rows, so
+screenshots of the served page are comparable across changes.
 
 It writes through the same functions the importers and inference use
 (`db.insert`, `inference.save*`, `db.record_import`), never straight into the
@@ -35,7 +38,7 @@ from . import inference as INF
 
 DAY = "2026-09-08"
 MODEL = "gemini-3.7-flash"
-BACK = 20                       # days before DAY, for the strip
+BACK = 22                       # days before DAY: back to the Monday three weeks before its own
 # The public demo's one moment: its imports ran then, and its page's clock
 # stands there — the morning after DAY, once the night's records are in.
 DEMO_NOW = int(dt.datetime(2026, 9, 9, 8, 0, tzinfo=dt.timezone.utc).timestamp() * 1000)
@@ -65,6 +68,27 @@ EVENTS = [
     ("20:30", "22:30", "code",    "Evening: UI redesign sketches"),
     ("22:35", "23:10", "read",    "Reading a book on economic history in WeRead"),
 ]
+
+# A Saturday or Sunday: nobody bikes to the office. Same rules as EVENTS.
+WEEKEND = [
+    ("00:00", "08:20", "sleep",   "Asleep (WHOOP)"),
+    ("08:20", "09:10", "meal",    "Slow breakfast"),
+    ("09:10", "09:50", "browse",  "News and feeds"),
+    ("10:00", "11:20", "workout", "Long run by the river"),
+    ("11:30", "12:30", "chore",   "Groceries and laundry"),
+    ("12:40", "13:40", "meal",    "Lunch with friends"),
+    ("13:40", "16:00", "social",  "Afternoon out with friends"),
+    ("16:10", "17:30", "read",    "Reading on the balcony"),
+    ("17:40", "18:40", "chore",   "Cooking"),
+    ("18:40", "19:30", "meal",    "Dinner at home"),
+    ("19:40", "21:30", "browse",  "A film and some scrolling"),
+    ("21:40", "23:00", "read",    "Reading a novel in WeRead"),
+]
+
+# How each week before DAY's goes, by how many weeks back it is: nights spent
+# up past midnight, and blocks of the first priority lost to feeds instead.
+# Counts, not chances, so the trend is the same on every run.
+ARC = {3: (5, 6), 2: (3, 3), 1: (1, 0), 0: (0, 0)}
 
 PROMPTS = ["move claims.py under plugins/ and keep the import path working",
            "why does test_claims fail after the move",
@@ -105,7 +129,8 @@ def _raw(day: str, events, rnd: random.Random) -> list:
         if cat == "sleep":
             add("whoop", "sleep", a, {}, b - a)
         elif cat == "workout":
-            add("whoop", "workout", a, {"sport": "Weightlifting"}, b - a)
+            add("whoop", "workout", a,
+                {"sport": "Running" if "run" in title.lower() else "Weightlifting"}, b - a)
         elif cat == "code":
             for m in range(a, b, 7):
                 add("claude", "prompt", m + rnd.random() * 5,
@@ -179,30 +204,34 @@ GOALS = ["Ship the plugin interfaces", "Redesign the timeline page", "Sleep befo
 
 
 def _goals(con) -> None:
-    """Priorities for DAY's week, and attribution for its judged
-    days — written to goal_attrib/goal_runs, the table older judgements live
-    in, which goals.load_attrib reads as it stands."""
+    """The same priorities every week the seed covers, and attribution for
+    their judged days — written to goal_attrib/goal_runs, the table older
+    judgements live in, which goals.load_attrib reads as it stands. Keeping
+    them the same is what makes week against week a trend."""
     from . import goals as G
-    wk = G.week_of(DAY)
-    G.save_goals(con, wk, GOALS, now_ms=1)
-    G.set_targets(con, wk, [(10, "hours"), (10, "hours"), (5, "sessions")])
     gdig = G.gdigest(GOALS)
-    mon = dt.date.fromisocalendar(int(wk[:4]), int(wk[6:]), 1)
-    for i in range(7):
-        day = (mon + dt.timedelta(i)).isoformat()
-        evs = INF.load_events(con, day).get(MODEL) or []
-        if not evs:
-            continue
-        for e in evs:
-            g = (1 if "claims" in e["title"] or "plugins" in e["title"] or "PR" in e["title"]
-                 else 2 if "UI" in e["title"] or "viz" in e["title"]
-                 else 3 if e["cat"] == "sleep" and e["a"] == 0 else None)
-            if g:
-                con.execute("INSERT OR IGNORE INTO goal_attrib (day, a_min, b_min, goal_idx, "
-                            "model, gdig, why) VALUES (?,?,?,?,?,?,?)",
-                            (day, e["a"], e["b"], g, MODEL, gdig, e["title"]))
-        con.execute("INSERT OR IGNORE INTO goal_runs (day, model, gdig, at_ms) "
-                    "VALUES (?,?,?,?)", (day, MODEL, gdig, 1))
+    first = dt.date.fromisoformat(DAY) - dt.timedelta(days=BACK)
+    mon = first - dt.timedelta(days=first.weekday())
+    while mon.isoformat() <= DAY:
+        wk = G.week_of(mon.isoformat())
+        G.save_goals(con, wk, GOALS, now_ms=1)
+        G.set_targets(con, wk, [(10, "hours"), (10, "hours"), (5, "sessions")])
+        for i in range(7):
+            day = (mon + dt.timedelta(i)).isoformat()
+            evs = INF.load_events(con, day).get(MODEL) or []
+            if not evs:
+                continue
+            for e in evs:
+                g = (1 if _ships(e["title"])
+                     else 2 if "UI" in e["title"] or "viz" in e["title"]
+                     else 3 if e["cat"] == "sleep" and e["a"] == 0 else None)
+                if g:
+                    con.execute("INSERT OR IGNORE INTO goal_attrib (day, a_min, b_min, goal_idx, "
+                                "model, gdig, why) VALUES (?,?,?,?,?,?,?)",
+                                (day, e["a"], e["b"], g, MODEL, gdig, e["title"]))
+            con.execute("INSERT OR IGNORE INTO goal_runs (day, model, gdig, at_ms) "
+                        "VALUES (?,?,?,?)", (day, MODEL, gdig, 1))
+        mon += dt.timedelta(days=7)
     con.commit()
 
 
@@ -238,22 +267,93 @@ def _said(con, day: str) -> None:
     con.commit()
 
 
-def _variant(rnd: random.Random):
+def _ships(title: str) -> bool:
+    """Does this block count toward the first priority (see _goals)?"""
+    return "claims" in title or "plugins" in title or "PR" in title
+
+
+def _variant(rnd: random.Random, weekend: bool = False, late: bool = False,
+             lose: int = 0, sketch: bool = False, up_tonight: bool = False):
     """A plausible other day: same shape, shifted and thinned — and never
     overlapping, as composed events never do: each starts no earlier than
-    the one before it ended."""
+    the one before it ended. late: up past midnight, so the night's sleep
+    starts after it. lose: this many first-priority blocks go to feeds.
+    sketch: a weekend evening with an hour on the redesign. up_tonight: the
+    next day starts late, so this one ends scrolling rather than asleep.
+
+    Unlike DAY, whose last stretch is left blank on purpose, these days run to
+    midnight, lose at most one short event (never the night's first or last), and
+    close the half-hour seams that shifting leaves — a made-up day full of "the model said nothing" reads as broken."""
+    src = list(WEEKEND if weekend else EVENTS)
+    src.append(("23:15", "24:00", "browse", "Up late, scrolling") if up_tonight
+               else ("23:15", "24:00", "sleep", "Asleep (WHOOP)"))
+    if sketch:
+        src = [e for e in src if e[0] < "19:40"] + [("19:40", "21:30", "code", "Evening: UI redesign sketches")]
+    if late:
+        up = rnd.choice((40, 55, 70))
+        src = [("00:00", _hm(up), "browse", "Up late, scrolling")] + [
+            (_hm(up), b, c, t) if c == "sleep" and a == "00:00" else (a, b, c, t)
+            for a, b, c, t in src]
     out = []
     last = 0
-    for a, b, cat, title in EVENTS:
-        if cat != "sleep" and rnd.random() < 0.15:
+    dropped = False
+    for a, b, cat, title in src:
+        if cat == "code" and _ships(title) and lose > 0:
+            lose -= 1
+            cat, title = "browse", "Lost in feeds and tabs"
+        elif (cat not in ("sleep", "code") and not dropped and _min(b) - _min(a) <= 50
+              and a != "00:00" and b != "24:00" and rnd.random() < 0.12):
+            dropped = True
             continue
         s = rnd.choice((-10, -5, 0, 5, 10))
         a2 = max(last, _min(a) + (0 if cat == "sleep" else s))
-        b2 = min(1440, _min(b) + s)
+        if a2 - last <= 30:
+            a2 = last
+        b2 = 1440 if b == "24:00" else min(1440, _min(b) + s)
         if b2 - a2 >= 10:
             last = b2
             out.append((_hm(a2), _hm(b2) if b2 < 1440 else "23:59", cat, title))
     return out
+
+
+def _reference_rng() -> random.Random:
+    """The random stream DAY's raw records were first cut from: Random(8) after
+    twenty days of the original, simpler variants. Replaying it keeps DAY
+    byte-for-byte what the README's screenshots show, whatever the other days
+    do now — they draw from a stream of their own."""
+    rnd = random.Random(8)
+    for _ in range(20):
+        out, last = [], 0
+        for a, b, cat, title in EVENTS:
+            if cat != "sleep" and rnd.random() < 0.15:
+                continue
+            s = rnd.choice((-10, -5, 0, 5, 10))
+            a2 = max(last, _min(a) + (0 if cat == "sleep" else s))
+            b2 = min(1440, _min(b) + s)
+            if b2 - a2 >= 10:
+                last = b2
+                out.append((_hm(a2), _hm(b2) if b2 < 1440 else "23:59", cat, title))
+        _raw(DAY, out, rnd)
+    return rnd
+
+
+def _arc(rnd: random.Random, last: dt.date) -> dict:
+    """ARC laid out on days: which nights run late, which weekdays lose how
+    many first-priority blocks. day -> keyword arguments for _variant."""
+    week0 = last - dt.timedelta(days=last.weekday())
+    plan = {}
+    for k, (late, lose) in ARC.items():
+        if not k:
+            continue
+        mon = week0 - dt.timedelta(days=7 * k)
+        days = [mon + dt.timedelta(days=i) for i in range(7)]
+        for d in rnd.sample(days, late):
+            plan.setdefault(d.isoformat(), {})["late"] = True
+        weekdays = days[:5]
+        for j in range(lose):
+            d = weekdays[j % 5].isoformat()
+            plan.setdefault(d, {})["lose"] = plan.get(d, {}).get("lose", 0) + 1
+    return plan
 
 
 CONFIG = """\
@@ -299,10 +399,18 @@ def seed(data_dir: str, config_dir: str | None = None, demo: bool = False) -> st
     con = db.connect(path)
     rnd = random.Random(8)
     last = dt.date.fromisoformat(DAY)
+    week0 = last - dt.timedelta(days=last.weekday())
+    plan = _arc(rnd, last)
+    ref = _reference_rng()
     for i in range(BACK, -1, -1):
-        day = (last - dt.timedelta(days=i)).isoformat()
-        evs = EVENTS if i == 0 else _variant(rnd)
-        db.insert(con, _raw(day, evs, rnd))
+        d = last - dt.timedelta(days=i)
+        day = d.isoformat()
+        k = (week0 - (d - dt.timedelta(days=d.weekday()))).days // 7
+        tomorrow = (d + dt.timedelta(days=1)).isoformat()
+        evs = EVENTS if i == 0 else _variant(
+            rnd, weekend=d.weekday() >= 5, sketch=d.weekday() == 6 and k <= 1,
+            up_tonight=plan.get(tomorrow, {}).get("late", False), **plan.get(day, {}))
+        db.insert(con, _raw(day, evs, ref if i == 0 else rnd))
         if i == UNJUDGED:
             continue            # recorded, never read: the hatch
         INF.save(con, day, MODEL, _spans(evs))
