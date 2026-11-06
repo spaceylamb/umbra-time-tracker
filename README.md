@@ -15,7 +15,7 @@
   <a href="https://spaceylamb.github.io/umbra-time-tracker/"><b>Live demo</b></a>
 </p>
 
-https://github.com/user-attachments/assets/95f912ab-97ad-4e12-b14f-fffd040f0604
+https://github.com/user-attachments/assets/8982e20c-562d-416b-8717-e10e9fbafa1f
 
 Pull your scattered digital footprints onto one timeline, and let an AI
 reconstruct **what you were actually doing all day** — sleep, commutes,
